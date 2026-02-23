@@ -125,3 +125,71 @@ func (es *ExpressionStatement) String() string {
 	}
 	return ""
 }
+
+type Parser struct {
+	lexer  *golexer.Lexer
+	errors []string
+
+	curToken  golexer.Token
+	peekToken golexer.Token
+}
+
+func (p *Parser) nextToken() {
+	p.curToken = p.peekToken
+	p.peekToken = p.lexer.NextToken()
+}
+func (p *Parser) curTokenIs(t golexer.TokenType) bool {
+	return p.curToken.Type == t
+}
+func (p *Parser) peekTokenIs(t golexer.TokenType) bool {
+	return p.peekToken.Type == t
+}
+func (p *Parser) expectPeek(t golexer.TokenType) bool {
+	if p.peekTokenIs(t) {
+		p.nextToken()
+		return true
+	} else {
+		p.peekError(t)
+		return false
+	}
+}
+func (p *Parser) peekError(t golexer.TokenType) {
+	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
+	p.errors = append(p.errors, msg)
+}
+func (p *Parser) Errors() []string {
+	return p.errors
+}
+
+func NewParser(lexer *golexer.Lexer) *Parser {
+	p := &Parser{
+		lexer:  lexer,
+		errors: []string{},
+	}
+	p.nextToken()
+	p.nextToken()
+	return p
+}
+func (p *Parser) Parse() *Program {
+	program := &Program{}
+	program.Statements = []Statement{}
+	for !p.curTokenIs(golexer.EOF) {
+		stmt := p.parseStatment()
+		if stmt != nil {
+			program.Statements = append(program.Statements, stmt)
+		}
+		p.nextToken()
+	}
+	return program
+}
+func (p *Parser) parseStatment() Statement {
+	switch p.curToken.Type {
+	case golexer.LET:
+		return p.parseLteStatment()
+	case golexer.RETURN:
+		return p.parseReturnStatment()
+	default:
+		return p.parseExpressionStatment()
+	}
+
+}
