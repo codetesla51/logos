@@ -63,6 +63,10 @@ type PrefixExpression struct {
 	Operator string
 	Right    Expression
 }
+type BooleanLiteral struct {
+	Token golexer.Token
+	Value bool
+}
 type LetStatement struct {
 	Token golexer.Token
 	Name  *Identifier
@@ -132,6 +136,9 @@ func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
 func (ie *InfixExpression) String() string {
 	return fmt.Sprintf("(%s %s %s)", ie.Left.String(), ie.Operator, ie.Right.String())
 }
+func (bl *BooleanLiteral) expressionNode()      {}
+func (bl *BooleanLiteral) TokenLiteral() string { return bl.Token.Literal }
+func (bl *BooleanLiteral) String() string       { return bl.Token.Literal }
 
 func (pe *PrefixExpression) expressionNode()      {}
 func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
@@ -281,6 +288,13 @@ func NewParser(lexer *golexer.Lexer) *Parser {
 	// prefix expressions
 	p.registerPrefix(golexer.MINUS, p.parsePrefixExpression)
 	p.registerPrefix(golexer.BANG, p.parsePrefixExpression)
+
+	// boolean literals
+	p.registerPrefix(golexer.TRUE, p.parseBoolean)
+	p.registerPrefix(golexer.FALSE, p.parseBoolean)
+
+	// if expressions
+	p.registerPrefix(golexer.IF, func() Expression { return p.parseIfExpression() })
 	p.nextToken()
 	p.nextToken()
 	return p
@@ -343,7 +357,7 @@ func (p *Parser) parseLetStatment() *LetStatement {
 	}
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-	if !p.peekTokenIs(golexer.SEMICOLON) {
+	if p.peekTokenIs(golexer.SEMICOLON) {
 		p.nextToken()
 	}
 	return stmt
@@ -477,4 +491,10 @@ func (p *Parser) parsePrefixExpression() Expression {
 	p.nextToken()
 	expression.Right = p.parseExpression(PREFIX)
 	return expression
+}
+func (p *Parser) parseBoolean() Expression {
+	return &BooleanLiteral{
+		Token: p.curToken,
+		Value: p.curTokenIs(golexer.TRUE),
+	}
 }

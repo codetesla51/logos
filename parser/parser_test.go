@@ -72,3 +72,80 @@ func TestParserPrecedence(t *testing.T) {
 		}
 	}
 }
+
+func TestBooleanLiterals(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"true", "true"},
+		{"false", "false"},
+		{"!true", "(!true)"},
+		{"!false", "(!false)"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+
+func TestIfExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"if (true) { 5 }", "if(true)5"},
+		{"if (false) { 5 } else { 10 }", "if(false)5else10"},
+		{"if (x > 5) { x + 1 }", "if((x > 5))(x + 1)"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+
+func TestPrefixExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"-5", "(-5)"},
+		{"!true", "(!true)"},
+		{"!false", "(!false)"},
+		{"-5 + 3", "((-5) + 3)"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}

@@ -8,46 +8,65 @@ import (
 )
 
 func main() {
-	// prog := &parser.Program{
-	// 	Statements: []parser.Statement{
-	// 		&parser.Identifier{Token: golexer.Token{Type: golexer.IDENT, Literal: "X"}, Value: "X"},
-	// 		&parser.LetStatement{
-	// 			Token: golexer.Token{Type: golexer.LET, Literal: "let"},
-	// 			Name:  &parser.Identifier{Token: golexer.Token{Type: golexer.IDENT, Literal: "y"}, Value: "y"},
-	// 			Value: &parser.InfixExpression{
-	// 				Token:    golexer.Token{Type: golexer.PLUS, Literal: "+"},
-	// 				Operator: "+",
-	// 				Left:     &parser.IntegerLiteral{Token: golexer.Token{Type: golexer.NUMBER, Literal: "5"}, Value: 5},
-	// 				Right:    &parser.IntegerLiteral{Token: golexer.Token{Type: golexer.NUMBER, Literal: "3"}, Value: 3},
-	// 			},
-	// 		},
-	// 		&parser.ReturnStatement{
-	// 			Token:       golexer.Token{Type: golexer.RETURN, Literal: "return"},
-	// 			ReturnValue: &parser.Identifier{Token: golexer.Token{Type: golexer.IDENT, Literal: "y"}, Value: "y"},
-	// 		},
-	// 		&parser.ExpressionStatement{
-	// 			Token: golexer.Token{Type: golexer.IDENT, Literal: "foobar"},
-	// 			Expression: &parser.InfixExpression{
-	// 				Token:    golexer.Token{Type: golexer.PLUS, Literal: "+"},
-	// 				Operator: "+",
-	// 				Left:     &parser.Identifier{Token: golexer.Token{Type: golexer.IDENT, Literal: "foobar"}, Value: "foobar"},
-	// 				Right:    &parser.Identifier{Token: golexer.Token{Type: golexer.IDENT, Literal: "y"}, Value: "y"},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// fmt.Println(prog.String())
+	// Test cases for various number formats and expressions
+	testCases := []string{
+		// Decimal integers
+		"let x = 42;",
+		"let y = 0;",
+		"let z = 1000;",
 
-	input := "if (x > 5) { x + 1; } else { x - 1; }"
-	lexer := golexer.NewLexer(input)
-	parser := parser.NewParser(lexer)
-	if len(parser.Errors()) != 0 {
-		fmt.Printf("parser has %d errors\n", len(parser.Errors()))
-		for _, err := range parser.Errors() {
-			fmt.Printf("\t%s\n", err)
-		}
-		return
+		// Floats
+		"let a = 3.14;",
+		"let b = 0.5;",
+		"let c = 2.0;",
+
+		// Hexadecimal
+		"let hex = 0xFF;",
+		"let hex2 = 0x1A2B;",
+
+		// Binary
+		"let bin = 0b1010;",
+		"let bin2 = 0B1111;",
+
+		// Octal
+		"let oct = 0o777;",
+		"let oct2 = 0755;",
+
+		// Booleans
+		"let flag = true;",
+		"let other = false;",
+
+		// Expressions
+		"5 + 3 * 2;",
+		"-42 + 10;",
+		"!true;",
+
+		// If expressions
+		"if (x > 5) { x + 1; } else { x - 1; }",
+
+		// Complex
+		"let result = if (0xFF > 100) { true } else { false };",
 	}
-	program := parser.Parse()
-	fmt.Println(program.String())
+
+	for _, input := range testCases {
+		fmt.Printf("\nInput:  %s\n", input)
+		lexer := golexer.NewLexer(input)
+		p := parser.NewParser(lexer)
+		program := p.Parse()
+
+		if len(p.Errors()) != 0 {
+			fmt.Printf("Errors (%d):\n", len(p.Errors()))
+			for _, err := range p.Errors() {
+				fmt.Printf("   - %s\n", err)
+			}
+			continue
+		}
+
+		if program == nil {
+			fmt.Printf("Parse returned nil\n")
+			continue
+		}
+
+		fmt.Printf("AST:    %s\n", program.String())
+	}
 }
