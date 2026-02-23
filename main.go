@@ -38,7 +38,7 @@ func main() {
 	// }
 	// fmt.Println(prog.String())
 
-	input := "5 + 3"
+	input := "if (x > 5) { x + 1; } else { x - 1; }"
 	lexer := golexer.NewLexer(input)
 	parser := parser.NewParser(lexer)
 	if len(parser.Errors()) != 0 {
