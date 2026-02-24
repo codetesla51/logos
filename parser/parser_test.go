@@ -7,47 +7,273 @@ import (
 )
 
 func TestParser(t *testing.T) {
-	input := "5 + 3"
-	l := golexer.NewLexer(input)
-	p := NewParser(l)
-	program := p.Parse()
-	if len(p.Errors()) != 0 {
-		t.Fatalf("parser has %d errors", len(p.Errors()))
+	tests := []struct {
+		name          string
+		input         string
+		expectedStmts int
+		expectedType  interface{}
+		validate      func(t *testing.T, stmt Statement)
+	}{
+		{
+			name:          "InfixExpression",
+			input:         "5 + 3",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				infixExp, ok := exprStmt.Expression.(*InfixExpression)
+				if !ok {
+					t.Fatalf("expected *InfixExpression, got %T", exprStmt.Expression)
+				}
+				if infixExp.Operator != "+" {
+					t.Fatalf("expected operator '+', got %q", infixExp.Operator)
+				}
+				if infixExp.Left.String() != "5" {
+					t.Fatalf("expected left '5', got %q", infixExp.Left.String())
+				}
+				if infixExp.Right.String() != "3" {
+					t.Fatalf("expected right '3', got %q", infixExp.Right.String())
+				}
+			},
+		},
+		{
+			name:          "IntegerLiteral",
+			input:         "42",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				intLit, ok := exprStmt.Expression.(*IntegerLiteral)
+				if !ok {
+					t.Fatalf("expected *IntegerLiteral, got %T", exprStmt.Expression)
+				}
+				if intLit.Value != 42 {
+					t.Fatalf("expected value 42, got %d", intLit.Value)
+				}
+			},
+		},
+		{
+			name:          "FloatLiteral",
+			input:         "3.14",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				floatLit, ok := exprStmt.Expression.(*FloatLiteral)
+				if !ok {
+					t.Fatalf("expected *FloatLiteral, got %T", exprStmt.Expression)
+				}
+				if floatLit.Value != 3.14 {
+					t.Fatalf("expected value 3.14, got %f", floatLit.Value)
+				}
+			},
+		},
+		{
+			name:          "Identifier",
+			input:         "x",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				ident, ok := exprStmt.Expression.(*Identifier)
+				if !ok {
+					t.Fatalf("expected *Identifier, got %T", exprStmt.Expression)
+				}
+				if ident.Value != "x" {
+					t.Fatalf("expected identifier 'x', got %q", ident.Value)
+				}
+			},
+		},
+		{
+			name:          "PrefixExpression",
+			input:         "-5",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				prefixExp, ok := exprStmt.Expression.(*PrefixExpression)
+				if !ok {
+					t.Fatalf("expected *PrefixExpression, got %T", exprStmt.Expression)
+				}
+				if prefixExp.Operator != "-" {
+					t.Fatalf("expected operator '-', got %q", prefixExp.Operator)
+				}
+				if prefixExp.Right.String() != "5" {
+					t.Fatalf("expected right '5', got %q", prefixExp.Right.String())
+				}
+			},
+		},
+		{
+			name:          "BooleanLiteral",
+			input:         "true",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				boolLit, ok := exprStmt.Expression.(*BooleanLiteral)
+				if !ok {
+					t.Fatalf("expected *BooleanLiteral, got %T", exprStmt.Expression)
+				}
+				if !boolLit.Value {
+					t.Fatalf("expected value true, got false")
+				}
+			},
+		},
+		{
+			name:          "LetStatement",
+			input:         "let x = 10;",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				letStmt, ok := stmt.(*LetStatement)
+				if !ok {
+					t.Fatalf("expected *LetStatement, got %T", stmt)
+				}
+				if letStmt.Name.Value != "x" {
+					t.Fatalf("expected name 'x', got %q", letStmt.Name.Value)
+				}
+				intLit, ok := letStmt.Value.(*IntegerLiteral)
+				if !ok {
+					t.Fatalf("expected *IntegerLiteral, got %T", letStmt.Value)
+				}
+				if intLit.Value != 10 {
+					t.Fatalf("expected value 10, got %d", intLit.Value)
+				}
+			},
+		},
+		{
+			name:          "ReturnStatement",
+			input:         "return 42",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				retStmt, ok := stmt.(*ReturnStatement)
+				if !ok {
+					t.Fatalf("expected *ReturnStatement, got %T", stmt)
+				}
+				intLit, ok := retStmt.ReturnValue.(*IntegerLiteral)
+				if !ok {
+					t.Fatalf("expected *IntegerLiteral, got %T", retStmt.ReturnValue)
+				}
+				if intLit.Value != 42 {
+					t.Fatalf("expected value 42, got %d", intLit.Value)
+				}
+			},
+		},
+		{
+			name:          "IfExpression",
+			input:         "if (x > 5) { 10 } else { 20 }",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				ifExp, ok := exprStmt.Expression.(*IfExpression)
+				if !ok {
+					t.Fatalf("expected *IfExpression, got %T", exprStmt.Expression)
+				}
+				if ifExp.Condition == nil {
+					t.Fatalf("expected condition, got nil")
+				}
+				if ifExp.Consequence == nil {
+					t.Fatalf("expected consequence block, got nil")
+				}
+				if ifExp.Alternative == nil {
+					t.Fatalf("expected alternative block, got nil")
+				}
+			},
+		},
+		{
+			name:          "FunctionLiteral",
+			input:         "fn(x, y) { x + y }",
+			expectedStmts: 1,
+			validate: func(t *testing.T, stmt Statement) {
+				exprStmt, ok := stmt.(*ExpressionStatement)
+				if !ok {
+					t.Fatalf("expected *ExpressionStatement, got %T", stmt)
+				}
+				fnLit, ok := exprStmt.Expression.(*FunctionLiteral)
+				if !ok {
+					t.Fatalf("expected *FunctionLiteral, got %T", exprStmt.Expression)
+				}
+				if len(fnLit.Parameters) != 2 {
+					t.Fatalf("expected 2 parameters, got %d", len(fnLit.Parameters))
+				}
+				if fnLit.Parameters[0].Value != "x" {
+					t.Fatalf("expected first param 'x', got %q", fnLit.Parameters[0].Value)
+				}
+				if fnLit.Parameters[1].Value != "y" {
+					t.Fatalf("expected second param 'y', got %q", fnLit.Parameters[1].Value)
+				}
+				if fnLit.Body == nil {
+					t.Fatalf("expected function body, got nil")
+				}
+			},
+		},
 	}
-	if program == nil {
-		t.Fatalf("Parse() returned nil")
-	}
-	if len(program.Statements) != 1 {
-		t.Fatalf("program.Statements does not contain 1 statements. got=%d", len(program.Statements))
-	}
-	stmt, ok := program.Statements[0].(*ExpressionStatement)
-	if !ok {
-		t.Fatalf("program.Statements[0] is not *ExpressionStatement. got=%T", program.Statements[0])
-	}
-	exp, ok := stmt.Expression.(*InfixExpression)
-	if !ok {
-		t.Fatalf("stmt.Expression is not *InfixExpression. got=%T", stmt.Expression)
-	}
-	if exp.Operator != "+" {
-		t.Fatalf("exp.Operator is not '+'. got=%q", exp.Operator)
-	}
-	if exp.Left.String() != "5" {
-		t.Fatalf("exp.Left.String() is not '5'. got=%q", exp.Left.String())
-	}
-	if exp.Right.String() != "3" {
-		t.Fatalf("exp.Right.String() is not '3'. got=%q", exp.Right.String())
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := golexer.NewLexer(tt.input)
+			p := NewParser(l)
+			program := p.Parse()
+
+			if len(p.Errors()) != 0 {
+				t.Fatalf("parser has %d errors: %v", len(p.Errors()), p.Errors())
+			}
+			if program == nil {
+				t.Fatalf("Parse() returned nil")
+			}
+			if len(program.Statements) != tt.expectedStmts {
+				t.Fatalf("expected %d statement(s), got %d", tt.expectedStmts, len(program.Statements))
+			}
+
+			tt.validate(t, program.Statements[0])
+		})
 	}
 }
 func TestParserErrors(t *testing.T) {
-	input := "5 +"
-	l := golexer.NewLexer(input)
-	p := NewParser(l)
-	program := p.Parse()
-	if len(p.Errors()) == 0 {
-		t.Fatalf("parser should have errors but got none")
+	tests := []struct {
+		input       string
+		shouldError bool
+	}{
+		{"5 +", true},
+		{"let x", true},
+		{"if (x", true},
+		{"fn(", true},
+		{"(5 + 3", true},
+		{"5 + 3", false},
+		{"let x = 5;", false},
+		{"if (true) { 5 }", false},
+		{"fn() { 5 }", false},
+		{"fn(x) { x + 1 }", false},
 	}
-	if program != nil {
-		t.Fatalf("Parse() should return nil when there are errors. got=%v", program)
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		hasErrors := len(p.Errors()) > 0
+		if hasErrors != tt.shouldError {
+			if tt.shouldError {
+				t.Fatalf("input=%q: expected errors but got none", tt.input)
+			} else {
+				t.Fatalf("input=%q: expected no errors but got: %v", tt.input, p.Errors())
+			}
+		}
+		if tt.shouldError && program != nil {
+			t.Fatalf("input=%q: Parse() should return nil when there are errors. got=%v", tt.input, program)
+		}
 	}
 }
 func TestParserPrecedence(t *testing.T) {
@@ -59,16 +285,22 @@ func TestParserPrecedence(t *testing.T) {
 		{"5 + 3 * 2", "(5 + (3 * 2))"},
 		{"5 * 3 + 2", "((5 * 3) + 2)"},
 		{"(5 + 3) * 2", "((5 + 3) * 2)"},
+		{"5 - 3", "(5 - 3)"},
+		{"10 / 2 * 3", "((10 / 2) * 3)"},
+		{"2 * 3 - 4", "((2 * 3) - 4)"},
+		{"10 - 5 - 2", "((10 - 5) - 2)"},
+		{"(10 - 5) * (2 + 3)", "((10 - 5) * (2 + 3))"},
+		{"1 + 2 * 3 - 4", "((1 + (2 * 3)) - 4)"},
 	}
 	for _, tt := range tests {
 		l := golexer.NewLexer(tt.input)
 		p := NewParser(l)
 		program := p.Parse()
 		if len(p.Errors()) != 0 {
-			t.Fatalf("parser has %d errors", len(p.Errors()))
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
 		}
 		if program.String() != tt.expected {
-			t.Fatalf("expected=%q, got=%q", tt.expected, program.String())
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
 		}
 	}
 }
@@ -82,6 +314,12 @@ func TestBooleanLiterals(t *testing.T) {
 		{"false", "false"},
 		{"!true", "(!true)"},
 		{"!false", "(!false)"},
+		{"!!true", "(!(!true))"},
+		{"true", "true"},
+		{"false", "false"},
+		{"!true", "(!true)"},
+		{"true == false", "(true == false)"},
+		{"true != false", "(true != false)"},
 	}
 	for _, tt := range tests {
 		l := golexer.NewLexer(tt.input)
@@ -104,9 +342,16 @@ func TestIfExpression(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"if (true) { 5 }", "if(true)5"},
-		{"if (false) { 5 } else { 10 }", "if(false)5else10"},
-		{"if (x > 5) { x + 1 }", "if((x > 5))(x + 1)"},
+		{"if (true) { 5 }", "if(true){5}"},
+		{"if (false) { 5 } else { 10 }", "if(false){5}else{10}"},
+		{"if (x > 5) { x + 1 }", "if((x > 5)){(x + 1)}"},
+		{"if (x < 10) { x * 2 } else { 0 }", "if((x < 10)){(x * 2)}else{0}"},
+		{"if (true) { 1 + 2 }", "if(true){(1 + 2)}"},
+		{"if (x == 5) { 100 }", "if((x == 5)){100}"},
+		{"if (x != y) { x + y }", "if((x != y)){(x + y)}"},
+		{"if (a > b) { a } else { b }", "if((a > b)){a}else{b}"},
+		{"if (5 > 3) { 5 > 2 }", "if((5 > 3)){(5 > 2)}"},
+		{"if (true) { if (false) { 1 } else { 2 } }", "if(true){if(false){1}else{2}}"},
 	}
 	for _, tt := range tests {
 		l := golexer.NewLexer(tt.input)
@@ -133,8 +378,219 @@ func TestPrefixExpressions(t *testing.T) {
 		{"!true", "(!true)"},
 		{"!false", "(!false)"},
 		{"-5 + 3", "((-5) + 3)"},
+		{"--5", "(-(-5))"},
+		{"-x", "(-x)"},
+		{"!x", "(!x)"},
+		{"-1 * 2", "((-1) * 2)"},
+		{"-(5 + 3)", "(-(5 + 3))"},
+		{"!(x > 5)", "(!(x > 5))"},
 	}
 	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+func TestFunctionLiteral(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"fn() { }", "fn(){}"},
+		{"fn(x) { x }", "fn(x){x}"},
+		{"fn(x) { x + 1; }", "fn(x){(x + 1)}"},
+		{"fn(x, y) { x + y; }", "fn(x, y){(x + y)}"},
+		{"fn(a, b, c) { a * b + c; }", "fn(a, b, c){((a * b) + c)}"},
+		{"fn(x) { x * 2 + 1 }", "fn(x){((x * 2) + 1)}"},
+		{"let f = fn(x) { x }; f", "let f = fn(x){x};f"},
+		{"fn(x) { fn(y) { x + y } }", "fn(x){fn(y){(x + y)}}"},
+		{"fn(a, b) { a - b }", "fn(a, b){(a - b)}"},
+		{"fn(n) { if (n > 0) { n } else { 0 } }", "fn(n){if((n > 0)){n}else{0}}"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+
+func TestReturnStatements(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"return 5", "return 5;"},
+		{"return 10", "return 10;"},
+		{"return x", "return x;"},
+		{"return x + y", "return (x + y);"},
+		{"return x * 2 + 1", "return ((x * 2) + 1);"},
+		{"return true", "return true;"},
+		{"return false", "return false;"},
+		{"return if (x > 5) { 10 } else { 20 }", "return if((x > 5)){10}else{20};"},
+		{"return fn(x) { x }", "return fn(x){x};"},
+		{"return x && y", "return (x && y);"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+
+func TestLogicalOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"x && y", "(x && y)"},
+		{"x || y", "(x || y)"},
+		{"true && false", "(true && false)"},
+		{"true || false", "(true || false)"},
+		{"x && y && z", "((x && y) && z)"},
+		{"x || y || z", "((x || y) || z)"},
+		{"x && y || z", "((x && y) || z)"},
+		{"x || y && z", "(x || (y && z))"},
+		{"(x && y) || (a && b)", "((x && y) || (a && b))"},
+		{"!x && y", "((!x) && y)"},
+		{"x && !y", "(x && (!y))"},
+		{"x > 5 && y < 10", "((x > 5) && (y < 10))"},
+		{"x == 5 || y == 10", "((x == 5) || (y == 10))"},
+		{"if (x && y) { 1 } else { 2 }", "if((x && y)){1}else{2}"},
+		{"if (x || y) { 1 } else { 2 }", "if((x || y)){1}else{2}"},
+		{"fn(a, b) { a && b }", "fn(a, b){(a && b)}"},
+		{"fn(a, b) { a || b }", "fn(a, b){(a || b)}"},
+		{"let result = x && y;", "let result = (x && y);"},
+		{"let result = x || y;", "let result = (x || y);"},
+		{"return x && y", "return (x && y);"},
+	}
+	for _, tt := range tests {
+		l := golexer.NewLexer(tt.input)
+		p := NewParser(l)
+		program := p.Parse()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("input=%q: parser has %d errors: %v", tt.input, len(p.Errors()), p.Errors())
+		}
+		if program == nil {
+			t.Fatalf("input=%q: Parse() returned nil", tt.input)
+		}
+		if program.String() != tt.expected {
+			t.Fatalf("input=%q: expected=%q, got=%q", tt.input, tt.expected, program.String())
+		}
+	}
+}
+
+func TestFunctionCalls(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		// Basic function calls
+		{"add()", "add()"},
+		{"f()", "f()"},
+		{"multiply()", "multiply()"},
+
+		// Single argument
+		{"add(5)", "add(5)"},
+		{"sqrt(16)", "sqrt(16)"},
+		{"f(x)", "f(x)"},
+		{"abs(-5)", "abs((-5))"},
+
+		// Multiple arguments
+		{"add(2, 3)", "add(2, 3)"},
+		{"multiply(4, 5)", "multiply(4, 5)"},
+		{"power(2, 8)", "power(2, 8)"},
+		{"min(10, 20, 30)", "min(10, 20, 30)"},
+
+		// Arguments with expressions
+		{"add(2 + 3, 4 * 5)", "add((2 + 3), (4 * 5))"},
+		{"f(x + y, a - b)", "f((x + y), (a - b))"},
+		{"max(x * 2, y / 3)", "max((x * 2), (y / 3))"},
+
+		// Nested function calls
+		{"f(g())", "f(g())"},
+		{"add(mul(2, 3), 4)", "add(mul(2, 3), 4)"},
+		{"f(g(h()))", "f(g(h()))"},
+		{"add(mul(2, 3), div(10, 5))", "add(mul(2, 3), div(10, 5))"},
+
+		// Function calls with identifiers and literals
+		{"len(arr)", "len(arr)"},
+		{"print(x)", "print(x)"},
+		{"say(\"hello\")", "say(\"hello\")"},
+
+		// Function calls with boolean arguments
+		{"if_else(true, 1, 2)", "if_else(true, 1, 2)"},
+		{"check(x > 5)", "check((x > 5))"},
+		{"validate(x && y)", "validate((x && y))"},
+
+		// Function calls in expressions
+		{"add(2, 3) + 5", "(add(2, 3) + 5)"},
+		{"mul(3, 4) * 2", "(mul(3, 4) * 2)"},
+		{"f(x) + g(y)", "(f(x) + g(y))"},
+		{"add(1, 2) == 3", "(add(1, 2) == 3)"},
+
+		// Function calls in let statements
+		{"let x = f();", "let x = f();"},
+		{"let y = add(2, 3);", "let y = add(2, 3);"},
+		{"let result = max(a, b, c);", "let result = max(a, b, c);"},
+
+		// Function calls in return statements
+		{"return f()", "return f();"},
+		{"return add(1, 2)", "return add(1, 2);"},
+		{"return mul(x, y)", "return mul(x, y);"},
+
+		// Function calls in if conditions
+		{"if (isEmpty(arr)) { 1 }", "if(isEmpty(arr)){1}"},
+		{"if (check(x)) { x } else { 0 }", "if(check(x)){x}else{0}"},
+		{"if (and(x > 5, y < 10)) { 1 }", "if(and((x > 5), (y < 10))){1}"},
+
+		// Function calls in function bodies
+		{"fn() { f() }", "fn(){f()}"},
+		{"fn(x) { add(x, 1) }", "fn(x){add(x, 1)}"},
+		{"fn(x, y) { mul(x, y) }", "fn(x, y){mul(x, y)}"},
+
+		// Complex nested cases
+		{"f(g(x), h(y))", "f(g(x), h(y))"},
+		{"add(mul(2, 3), div(10, 5), sub(7, 2))", "add(mul(2, 3), div(10, 5), sub(7, 2))"},
+		{"len(reverse(sort(arr)))", "len(reverse(sort(arr)))"},
+
+		// Function calls with logical operators
+		{"f(x && y)", "f((x && y))"},
+		{"f(x || y)", "f((x || y))"},
+		{"g(a && b, c || d)", "g((a && b), (c || d))"},
+
+		// Function calls with prefix operators
+		{"f(-x)", "f((-x))"},
+		{"g(!x)", "g((!x))"},
+		{"h(-a, !b)", "h((-a), (!b))"},
+	}
+	for _, tt := range testCases {
 		l := golexer.NewLexer(tt.input)
 		p := NewParser(l)
 		program := p.Parse()

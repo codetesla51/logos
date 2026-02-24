@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-	// Test cases for various number formats and expressions
 	testCases := []string{
 		// Decimal integers
 		"let x = 42;",
@@ -46,6 +45,11 @@ func main() {
 
 		// Complex
 		"let result = if (0xFF > 100) { true } else { false };",
+		"let func = fn(x, y) { x + y; };",
+		"let add = fn(x,y) {return x && y; };",
+		"add(1,2);",
+		"let name = \"Alice\";",
+		"let raw = `This is a raw string\nwith a newline.`;",
 	}
 
 	for _, input := range testCases {
