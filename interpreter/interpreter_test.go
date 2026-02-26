@@ -193,3 +193,279 @@ func TestIfExpression(t *testing.T) {
 		})
 	}
 }
+func TestFunctionLiteral(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		{"fn(x) { x }", "fn(x) {\nx\n}", "function literal returns function object"},
+		{"fn(x, y) { x + y }", "fn(x, y) {\n(x + y)\n}", "multi param function literal"},
+		{"fn() { 5 }", "fn() {\n5\n}", "no param function literal"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.Type() != FUNCTION_OBJ {
+				t.Errorf("[%s] expected FUNCTION_OBJ, got %s", tc.desc, result.Type())
+			}
+		})
+	}
+}
+
+func TestEvalFunctionCalls(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		{"let add = fn(x, y) { x + y }; add(5, 10)", "15", "basic two param call"},
+		{"let double = fn(x) { x * 2 }; double(5)", "10", "single param call"},
+		{"let identity = fn(x) { x }; identity(5)", "5", "identity function"},
+		{"let noParam = fn() { 5 }; noParam()", "5", "no param call"},
+		{"let f = fn(x) { 1; 2; x }; f(5)", "5", "implicit return is last value"},
+		{"let f = fn(x) { return x; 999 }; f(5)", "5", "explicit return exits early"},
+		{"notAFunction(5)", "ERROR: identifier not found: notAFunction", "undefined function"},
+		{"let x = 5; x(5)", "ERROR: not a function: INTEGER", "call non function"},
+		{"true(5)", "ERROR: not a function: BOOLEAN", "call boolean as function"},
+		{"let add = fn(x, y) { x + y }; add(x, 5)", "ERROR: identifier not found: x", "error in first arg"},
+		{"let add = fn(x, y) { x + y }; add(5, x)", "ERROR: identifier not found: x", "error in second arg"},
+		{"let x = 10; let f = fn(x) { x }; f(5); x", "10", "function param doesnt leak to outer env"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}
+
+func TestApplyFunction(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		{
+			`let factorial = fn(n) {
+				if (n == 0) { return 1 }
+				n * factorial(n - 1)
+			};
+			factorial(5)`,
+			"120",
+			"recursive factorial",
+		},
+		{
+			`let fib = fn(n) {
+				if (n <= 1) { return n }
+				fib(n - 1) + fib(n - 2)
+			};
+			fib(10)`,
+			"55",
+			"recursive fibonacci",
+		},
+		{
+			`let apply = fn(f, x) { f(x) };
+			let double = fn(x) { x * 2 };
+			apply(double, 5)`,
+			"10",
+			"function as argument",
+		},
+		{
+			`let makeAdder = fn(x) { fn(y) { x + y } };
+			let add5 = makeAdder(5);
+			add5(3)`,
+			"8",
+			"function as return value closure",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}
+func TestBangOperator(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		{"!true", "false", "bang true"},
+		{"!false", "true", "bang false"},
+		{"!null", "true", "bang null is true"},
+		{"!5", "false", "bang integer is false"},
+		{"!0", "false", "bang zero is false"},
+		{"!!true", "true", "double bang true"},
+		{"!!false", "false", "double bang false"},
+		{"!!5", "true", "double bang integer"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}
+
+func TestMinusPrefixOperator(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		// integer
+		{"-5", "-5", "negate positive integer"},
+		{"-10", "-10", "negate ten"},
+		{"--5", "5", "double negate integer"},
+		{"-0", "0", "negate zero"},
+
+		// float
+		{"-5.0", "-5", "negate positive float"},
+		{"-10.5", "-10.5", "negate float with decimal"},
+		{"--5.0", "5", "double negate float"},
+		{"-0.0", "-0", "negate zero float"},
+
+		// errors
+		{"-true", "ERROR: unknown operator: -BOOLEAN", "negate boolean"},
+		{"-null", "ERROR: unknown operator: -NULL", "negate null"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}
+func TestArrayLiteral(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		// basic arrays
+		{"[1, 2, 3]", "[1, 2, 3]", "integer array"},
+		{"[1.0, 2.0, 3.0]", "[1, 2, 3]", "float array"},
+		{`["hello", "world"]`, "[hello, world]", "string array"},
+		{"[true, false]", "[true, false]", "boolean array"},
+		{"[]", "[]", "empty array"},
+
+		// mixed types
+		{`[1, "hello", true]`, `[1, hello, true]`, "mixed type array"},
+
+		// expressions as elements
+		{"[1 + 2, 3 * 4]", "[3, 12]", "expression elements"},
+		{"let x = 5; [x, x + 1]", "[5, 6]", "variable elements"},
+
+		// error in element bubbles up
+		{"[1, x, 3]", "ERROR: identifier not found: x", "error in element bubbles up"},
+
+		// nested arrays
+		{"[[1, 2], [3, 4]]", "[[1, 2], [3, 4]]", "nested arrays"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}
+func TestAndOr(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+		desc     string
+	}{
+		// &&
+		{"true && true", "true", "true and true"},
+		{"true && false", "false", "true and false"},
+		{"false && true", "false", "false and true"},
+		{"false && false", "false", "false and false"},
+
+		// ||
+		{"true || true", "true", "true or true"},
+		{"true || false", "true", "true or false"},
+		{"false || true", "true", "false or true"},
+		{"false || false", "false", "false or false"},
+
+		// short circuit &&
+		{"false && 1", "false", "short circuit and does not eval right"},
+		{"true && true", "true", "and evals right when left is true"},
+
+		// short circuit ||
+		{"true || 1", "true", "short circuit or does not eval right"},
+		{"false || true", "true", "or evals right when left is false"},
+
+		// with expressions
+		{"1 == 1 && 2 == 2", "true", "expression and expression"},
+		{"1 == 2 && 2 == 2", "false", "false expression and true expression"},
+		{"1 == 2 || 2 == 2", "true", "false expression or true expression"},
+		{"1 == 2 || 2 == 3", "false", "false expression or false expression"},
+
+		// chained
+		{"true && true && true", "true", "chained and"},
+		{"true && false && true", "false", "chained and with false"},
+		{"false || false || true", "true", "chained or"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := parser.NewParser(lexer)
+			program := p.Parse()
+			i := NewInterpreter()
+			result := i.Eval(program, i.Env)
+
+			if result.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, result.String())
+			}
+		})
+	}
+}

@@ -99,7 +99,7 @@ import (
 )
 
 func main() {
-	input := "let add = fn(x, y) { x + y; }; add(5, 10);"
+	input := "let fib = fn(n) {if (n <= 1) { return n }fib(n - 1) + fib(n - 2)};fib(10);"
 	lexer := golexer.NewLexerWithConfig(input, "tokens.json")
 	parsr := parser.NewParser(lexer)
 	program := parsr.Parse()

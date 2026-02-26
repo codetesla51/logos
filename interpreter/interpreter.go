@@ -50,6 +50,9 @@ type Float struct {
 type Bool struct {
 	Value bool
 }
+type Array struct {
+	Elements []Object
+}
 type Null struct{}
 type ReturnValue struct {
 	Value Object
@@ -137,7 +140,21 @@ func (s *String) Type() ObjectType {
 func (s *String) String() string {
 	return s.Value
 }
-
+func (a *Array) Type() ObjectType {
+	return ARRAY_OBJ
+}
+func (a *Array) String() string {
+	var out strings.Builder
+	out.WriteString("[")
+	for i, e := range a.Elements {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString(e.String())
+	}
+	out.WriteString("]")
+	return out.String()
+}
 func NewEnvironment() *Environment {
 	return &Environment{store: make(map[string]Object), outer: nil}
 }
@@ -216,6 +233,10 @@ func (i *Interpreter) Eval(node parser.Node, env *Environment) Object {
 		return i.evalFunctionLiteral(node, env)
 	case *parser.CallExpression:
 		return i.evalFunctionCalls(node, env)
+	case *parser.PrefixExpression:
+		return i.evalPrefixExpression(node, env)
+	case *parser.ArrayLiteral:
+		return i.evalArrayLiteral(node, env)
 	default:
 		return newError("unknown node type %T", node)
 	}
@@ -267,6 +288,24 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		return nativeBoolToBooleanObject(left == right)
 	case node.Operator == "!=":
 		return nativeBoolToBooleanObject(left != right)
+	case node.Operator == "&&":
+		if !isTruthy(left) {
+			return FALSE
+		}
+		right = i.Eval(node.Right, env)
+		if isError(right) {
+			return right
+		}
+		return nativeBoolToBooleanObject(isTruthy(right))
+	case node.Operator == "||":
+		if isTruthy(left) {
+			return TRUE
+		}
+		right = i.Eval(node.Right, env)
+		if isError(right) {
+			return right
+		}
+		return nativeBoolToBooleanObject(isTruthy(right))
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s", left.Type(), node.Operator, right.Type())
 	default:
@@ -336,6 +375,7 @@ func (i *Interpreter) evalFloatInfixExpression(operator string, left, right Obje
 		return nativeBoolToBooleanObject(leftVal <= rightVal)
 	case ">=":
 		return nativeBoolToBooleanObject(leftVal >= rightVal)
+
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
@@ -443,4 +483,43 @@ func (i *Interpreter) unwrapReturnValue(obj Object) Object {
 		return returnValue.Value
 	}
 	return obj
+}
+func (i *Interpreter) evalPrefixExpression(node *parser.PrefixExpression, env *Environment) Object {
+	right := i.Eval(node.Right, env)
+	if isError(right) {
+		return right
+	}
+	switch node.Operator {
+	case "!":
+		return i.evalBangOperatorExpression(right)
+	case "-":
+		if right.Type() == FLOAT_OBJ {
+			return i.evalMinusPrefixOperatorExpressionFloat(right)
+		}
+		if right.Type() == INTEGER_OBJ {
+			return i.evalMinusPrefixOperatorExpression(right)
+		}
+		return newError("unknown operator: %s%s", node.Operator, right.Type())
+
+	default:
+		return newError("unknown operator: %s%s", node.Operator, right.Type())
+	}
+}
+func (i *Interpreter) evalBangOperatorExpression(right Object) Object {
+	return nativeBoolToBooleanObject(!isTruthy(right))
+}
+func (i *Interpreter) evalMinusPrefixOperatorExpression(right Object) Object {
+	rightVal := right.(*Integar).Value
+	return &Integar{Value: -rightVal}
+}
+func (i *Interpreter) evalMinusPrefixOperatorExpressionFloat(right Object) Object {
+	rightVal := right.(*Float).Value
+	return &Float{Value: -rightVal}
+}
+func (i *Interpreter) evalArrayLiteral(node *parser.ArrayLiteral, env *Environment) Object {
+	elements := i.evalExpressions(node.Elements, env)
+	if len(elements) == 1 && isError(elements[0]) {
+		return elements[0]
+	}
+	return &Array{Elements: elements}
 }
