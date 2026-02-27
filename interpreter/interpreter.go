@@ -60,7 +60,10 @@ type ReturnValue struct {
 }
 type Error struct {
 	Message string
+	Line    int
+	Column  int
 }
+
 type Function struct {
 	Parameters []*parser.Identifier
 	Body       *parser.BlockStatement
@@ -114,11 +117,12 @@ func (rv *ReturnValue) String() string {
 func (e *Error) Type() ObjectType {
 	return ERROR_OBJ
 }
+
 func (e *Error) String() string {
-	var out strings.Builder
-	out.WriteString("ERROR: ")
-	out.WriteString(e.Message)
-	return out.String()
+	if e.Line > 0 {
+		return fmt.Sprintf("ERROR [%d:%d]: %s", e.Line, e.Column, e.Message)
+	}
+	return fmt.Sprintf("ERROR: %s", e.Message)
 }
 func (f *Function) Type() ObjectType {
 	return FUNCTION_OBJ
@@ -184,6 +188,16 @@ func (e *Environment) Set(name string, val Object) Object {
 	e.store[name] = val
 	return val
 }
+func (e *Environment) Update(name string, val Object) Object {
+	if _, ok := e.store[name]; ok {
+		e.store[name] = val
+		return val
+	}
+	if e.outer != nil {
+		return e.outer.Update(name, val)
+	}
+	return nil
+}
 func NewInterpreter() *Interpreter {
 	return &Interpreter{Env: NewEnvironment()}
 }
@@ -201,6 +215,14 @@ func isTruthy(obj Object) bool {
 }
 func newError(format string, a ...interface{}) *Error {
 	return &Error{Message: fmt.Sprintf(format, a...)}
+}
+
+func newErrorAt(line, col int, format string, a ...interface{}) *Error {
+	return &Error{
+		Message: fmt.Sprintf(format, a...),
+		Line:    line,
+		Column:  col,
+	}
 }
 func isError(obj Object) bool {
 	if obj != nil {
@@ -271,7 +293,7 @@ func (i *Interpreter) evalIdentifier(node *parser.Identifier, env *Environment) 
 	if builtin, ok := builtins[node.Value]; ok {
 		return builtin
 	}
-	return newError("identifier not found: %s", node.Value)
+	return newErrorAt(node.Token.Line, node.Token.Column, "identifier not found: %s", node.Value)
 }
 func (i *Interpreter) evalLetStatement(node *parser.LetStatement, env *Environment) Object {
 	val := i.Eval(node.Value, env)
@@ -282,6 +304,21 @@ func (i *Interpreter) evalLetStatement(node *parser.LetStatement, env *Environme
 	return val
 }
 func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Environment) Object {
+	if node.Operator == "=" {
+		ident, ok := node.Left.(*parser.Identifier)
+		if !ok {
+			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
+		}
+		val := i.Eval(node.Right, env)
+		if isError(val) {
+			return val
+		}
+		result := env.Update(ident.Value, val)
+		if result == nil {
+			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.Value)
+		}
+		return val
+	}
 	left := i.Eval(node.Left, env)
 	if isError(left) {
 		return left
@@ -291,12 +328,13 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		return right
 	}
 	switch {
+
 	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
-		return i.evalIntegerInfixExpression(node.Operator, left, right)
+		return i.evalIntegerInfixExpression(node.Operator, left, right, node.Token.Line, node.Token.Column)
 	case left.Type() == FLOAT_OBJ && right.Type() == FLOAT_OBJ:
-		return i.evalFloatInfixExpression(node.Operator, left, right)
+		return i.evalFloatInfixExpression(node.Operator, left, right, node.Token.Line, node.Token.Column)
 	case left.Type() == STRING_OBJ && right.Type() == STRING_OBJ:
-		return i.evalStringInfixExpression(node.Operator, left, right)
+		return i.evalStringInfixExpression(node.Operator, left, right, node.Token.Line, node.Token.Column)
 	case node.Operator == "==":
 		return nativeBoolToBooleanObject(left == right)
 	case node.Operator == "!=":
@@ -320,12 +358,14 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		}
 		return nativeBoolToBooleanObject(isTruthy(right))
 	case left.Type() != right.Type():
-		return newError("type mismatch: %s %s %s", left.Type(), node.Operator, right.Type())
+		return newErrorAt(node.Token.Line, node.Token.Column,
+			"type mismatch: %s %s %s", left.Type(), node.Operator, right.Type())
 	default:
-		return newError("unknown operator: %s %s %s", left.Type(), node.Operator, right.Type())
+		return newErrorAt(node.Token.Line, node.Token.Column,
+			"unknown operator: %s %s %s", left.Type(), node.Operator, right.Type())
 	}
 }
-func (i *Interpreter) evalIntegerInfixExpression(operator string, left, right Object) Object {
+func (i *Interpreter) evalIntegerInfixExpression(operator string, left, right Object, line, col int) Object {
 	rightVal := right.(*Integar).Value
 	leftVal := left.(*Integar).Value
 	switch operator {
@@ -337,12 +377,12 @@ func (i *Interpreter) evalIntegerInfixExpression(operator string, left, right Ob
 		return &Integar{Value: leftVal * rightVal}
 	case "/":
 		if rightVal == 0 {
-			return newError("division by zero")
+			return newErrorAt(line, col, "division by zero")
 		}
 		return &Integar{Value: leftVal / rightVal}
 	case "%":
 		if rightVal == 0 {
-			return newError("modulo by zero")
+			return newErrorAt(line, col, "modulo by zero")
 		}
 		return &Integar{Value: leftVal % rightVal}
 	case "==":
@@ -358,10 +398,10 @@ func (i *Interpreter) evalIntegerInfixExpression(operator string, left, right Ob
 	case ">=":
 		return nativeBoolToBooleanObject(leftVal >= rightVal)
 	default:
-		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+		return newErrorAt(line, col, "unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
-func (i *Interpreter) evalFloatInfixExpression(operator string, left, right Object) Object {
+func (i *Interpreter) evalFloatInfixExpression(operator string, left, right Object, line, col int) Object {
 	rightVal := right.(*Float).Value
 	leftVal := left.(*Float).Value
 	switch operator {
@@ -373,7 +413,7 @@ func (i *Interpreter) evalFloatInfixExpression(operator string, left, right Obje
 		return &Float{Value: leftVal * rightVal}
 	case "/":
 		if rightVal == 0 {
-			return newError("division by zero")
+			return newErrorAt(line, col, "division by zero")
 		}
 		return &Float{Value: leftVal / rightVal}
 	case "==":
@@ -390,7 +430,7 @@ func (i *Interpreter) evalFloatInfixExpression(operator string, left, right Obje
 		return nativeBoolToBooleanObject(leftVal >= rightVal)
 
 	default:
-		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+		return newErrorAt(line, col, "unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 
@@ -407,7 +447,7 @@ func (i *Interpreter) evalReturnStatement(node *parser.ReturnStatement, env *Env
 	}
 	return &ReturnValue{Value: val}
 }
-func (i *Interpreter) evalStringInfixExpression(operator string, left, right Object) Object {
+func (i *Interpreter) evalStringInfixExpression(operator string, left, right Object, line, col int) Object {
 	leftVal := left.(*String).Value
 	rightVal := right.(*String).Value
 	switch operator {
@@ -418,7 +458,7 @@ func (i *Interpreter) evalStringInfixExpression(operator string, left, right Obj
 	case "!=":
 		return nativeBoolToBooleanObject(leftVal != rightVal)
 	default:
-		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+		return newErrorAt(line, col, "unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 func (i *Interpreter) evalBlockStatment(block *parser.BlockStatement, env *Environment) Object {
@@ -515,10 +555,9 @@ func (i *Interpreter) evalPrefixExpression(node *parser.PrefixExpression, env *E
 		if right.Type() == INTEGER_OBJ {
 			return i.evalMinusPrefixOperatorExpression(right)
 		}
-		return newError("unknown operator: %s%s", node.Operator, right.Type())
-
+		return newErrorAt(node.Token.Line, node.Token.Column, "unknown operator: %s%s", node.Operator, right.Type())
 	default:
-		return newError("unknown operator: %s%s", node.Operator, right.Type())
+		return newErrorAt(node.Token.Line, node.Token.Column, "unknown operator: %s%s", node.Operator, right.Type())
 	}
 }
 func (i *Interpreter) evalBangOperatorExpression(right Object) Object {

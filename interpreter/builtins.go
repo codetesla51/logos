@@ -21,4 +21,37 @@ func init() {
 			return NULL
 		},
 	}
+	builtins["type"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(
+					"type() takes exactly 1 argument, got %d",
+					len(args),
+				)
+			}
+			return &String{Value: string(args[0].Type())}
+		},
+	}
+	builtins["len"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(
+					"len() takes exactly 1 argument, got %d",
+					len(args),
+				)
+			}
+			switch arg := args[0].(type) {
+			case *String:
+				return &Integar{Value: int64(len(arg.Value))}
+			case *Array:
+				return &Integar{Value: int64(len(arg.Elements))}
+				// todo add table
+			default:
+				return newError(
+					"len() not supported for %s",
+					args[0].Type(),
+				)
+			}
+		},
+	}
 }

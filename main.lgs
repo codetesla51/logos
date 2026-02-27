@@ -1,0 +1,17 @@
+let x = 10
+let y = 3
+
+if x > 5 {
+    print("x is greater than 5")
+}
+
+if x > y {
+    print("x is greater than y")
+} else {
+    print("y is greater than x")
+}
+
+let result = x % 2 == 0
+if result {
+    print("x is even")
+}

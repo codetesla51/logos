@@ -30,6 +30,7 @@ const (
 	ARROW   = golexer.ARROW
 	IN      = golexer.TokenType("IN")
 	TABLE   = golexer.TokenType("TABLE")
+	USE     = golexer.TokenType("USE")
 )
 
 // Node is the base interface for all AST nodes.
@@ -166,6 +167,10 @@ type TablePair struct {
 	Key   Expression
 	Value Expression
 }
+type UseStatement struct {
+	token    golexer.Token
+	FileName *StringLiteral
+}
 type PrefixParsefn func() Expression
 type InfixParsefn func(Expression) Expression
 
@@ -234,12 +239,23 @@ func (pe *PrefixExpression) String() string {
 	return fmt.Sprintf("(%s%s)", pe.Operator, pe.Right.String())
 }
 
-func (ls *LetStatement) statmentNode()        {}
-func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
+func (ls *LetStatement) statmentNode() {}
+func (ls *LetStatement) TokenLiteral() string {
+	if ls == nil || ls.Token.Literal == "" {
+		return ""
+	}
+	return ls.Token.Literal
+}
+
 func (ls *LetStatement) String() string {
+	if ls == nil {
+		return ""
+	}
 	var out strings.Builder
 	out.WriteString(ls.TokenLiteral() + " ")
-	out.WriteString(ls.Name.String())
+	if ls.Name != nil {
+		out.WriteString(ls.Name.String())
+	}
 	out.WriteString(" = ")
 	if ls.Value != nil {
 		out.WriteString(ls.Value.String())
@@ -247,7 +263,6 @@ func (ls *LetStatement) String() string {
 	out.WriteString(";")
 	return out.String()
 }
-
 func (rs *ReturnStatement) statmentNode()        {}
 func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
 func (rs *ReturnStatement) String() string {
@@ -264,9 +279,7 @@ func (ie *IfExpression) TokenLiteral() string { return ie.Token.Literal }
 func (ie *IfExpression) String() string {
 	var out strings.Builder
 	out.WriteString("if")
-	out.WriteString("(")
 	out.WriteString(ie.Condition.String())
-	out.WriteString(")")
 	out.WriteString(ie.Consequence.String())
 	if ie.Alternative != nil {
 		out.WriteString("else")
@@ -280,10 +293,9 @@ func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
 func (fs *ForStatement) String() string {
 	var out strings.Builder
 	out.WriteString(fs.TokenLiteral())
-	out.WriteString("(")
+	out.WriteString(" ")
 	out.WriteString(fs.Condition.String())
-	out.WriteString(")")
-
+	out.WriteString(" ")
 	out.WriteString(fs.Body.String())
 	return out.String()
 }
@@ -397,11 +409,9 @@ func (ss *SwitchStatement) statmentNode()        {}
 func (ss *SwitchStatement) TokenLiteral() string { return ss.Token.Literal }
 func (ss *SwitchStatement) String() string {
 	var out strings.Builder
-	out.WriteString("switch")
-	out.WriteString("(")
+	out.WriteString("switch ")
 	out.WriteString(ss.Expression.String())
-	out.WriteString(")")
-	out.WriteString("{")
+	out.WriteString(" {")
 	for _, c := range ss.Cases {
 		out.WriteString("case ")
 		out.WriteString(c.Condition.String())
@@ -435,12 +445,11 @@ func (fi *ForInStatement) statmentNode()        {}
 func (fi *ForInStatement) TokenLiteral() string { return fi.Token.Literal }
 func (fi *ForInStatement) String() string {
 	var out strings.Builder
-	out.WriteString("for")
-	out.WriteString("(")
+	out.WriteString("for ")
 	out.WriteString(fi.item.String())
 	out.WriteString(" in ")
 	out.WriteString(fi.collection.String())
-	out.WriteString(")")
+	out.WriteString(" ")
 	out.WriteString(fi.Body.String())
 	return out.String()
 }
@@ -464,6 +473,13 @@ func (tl *TableLiteral) String() string {
 	out.WriteString("}")
 	return out.String()
 
+}
+func (us *UseStatement) statmentNode()        {}
+func (us *UseStatement) TokenLiteral() string { return us.token.Literal }
+func (us *UseStatement) String() string {
+	var out strings.Builder
+	out.WriteString(us.FileName.Value)
+	return out.String()
 }
 
 // Parser implements a Pratt parser for parsing tokens into an AST.
@@ -497,13 +513,20 @@ func (p *Parser) expectPeek(t golexer.TokenType) bool {
 	}
 }
 func (p *Parser) peekError(t golexer.TokenType) {
-	msg := fmt.Sprintf("expected next token to be %s, got %s instead on line %d col %d", t, p.peekToken.Type, p.peekToken.Line, p.peekToken.Column)
+	msg := fmt.Sprintf(
+		"SyntaxError: unexpected token '%s', expected '%s' at line %d:%d",
+		p.peekToken.Literal,
+		t,
+		p.peekToken.Line,
+		p.peekToken.Column,
+	)
 	p.errors = append(p.errors, msg)
 }
+
 func (p *Parser) noPrefixParseFnError(t golexer.TokenType) {
 	msg := fmt.Sprintf(
-		"no prefix parse function for %s found on line %d col %d",
-		t,
+		"SyntaxError: unexpected token '%s' at line %d:%d",
+		p.curToken.Literal,
 		p.curToken.Line,
 		p.curToken.Column,
 	)
@@ -639,6 +662,9 @@ func (p *Parser) parseStatment() Statement {
 			Expression: p.parseIfExpression(),
 		}
 	case golexer.FN:
+		if p.peekTokenIs(golexer.IDENT) {
+			return p.parseNamedFunction()
+		}
 		return &ExpressionStatement{
 			Token:      p.curToken,
 			Expression: p.parseFunctionLiteral(),
@@ -653,6 +679,8 @@ func (p *Parser) parseStatment() Statement {
 		}
 	case SWITCH:
 		return p.parseSwitchStatement()
+	case USE:
+		return p.parseUseStament()
 
 	default:
 		return p.parseExpressionStatment()
@@ -713,16 +741,10 @@ func (p *Parser) parseIfExpression() *IfExpression {
 	stmt := &IfExpression{
 		Token: p.curToken,
 	}
-	if !p.expectPeek(golexer.LPAREN) {
-		p.synchronize()
-		return nil
-	}
+
 	p.nextToken()
 	stmt.Condition = p.parseExpression(LOWEST)
-	if !p.expectPeek(golexer.RPAREN) {
-		p.synchronize()
-		return nil
-	}
+
 	if !p.expectPeek(golexer.LBRACE) {
 		p.synchronize()
 		return nil
@@ -741,26 +763,14 @@ func (p *Parser) parseIfExpression() *IfExpression {
 
 func (p *Parser) parseForStatement() Statement {
 	stmt := &ForStatement{Token: p.curToken}
-	if !p.expectPeek(golexer.LPAREN) {
-		p.synchronize()
-		return nil
-	}
 	p.nextToken()
 	if p.curTokenIs(golexer.IDENT) && p.peekTokenIs(IN) {
 		return p.parseForInStatement()
 	}
-	if p.curTokenIs(golexer.RPAREN) {
-
-		p.nextToken()
-	} else {
-		stmt.Condition = p.parseExpression(LOWEST)
-		if !p.expectPeek(golexer.RPAREN) {
-			p.synchronize()
-			return nil
-		}
-		p.nextToken()
-	}
 	if !p.curTokenIs(golexer.LBRACE) {
+		stmt.Condition = p.parseExpression(LOWEST)
+	}
+	if !p.expectPeek(golexer.LBRACE) {
 		p.synchronize()
 		return nil
 	}
@@ -869,11 +879,14 @@ func (p *Parser) parseBoolean() Expression {
 	}
 }
 func (p *Parser) parseFunctionLiteral() Expression {
+
 	lit := &FunctionLiteral{Token: p.curToken}
+
 	if !p.expectPeek(golexer.LPAREN) {
 		p.synchronize()
 		return nil
 	}
+
 	lit.Parameters = p.parseFunctionParameters()
 	if p.peekTokenIs(ARROW) {
 		p.nextToken()
@@ -896,6 +909,17 @@ func (p *Parser) parseFunctionLiteral() Expression {
 		lit.Body = p.parseBlockStatement()
 	}
 	return lit
+}
+func (p *Parser) parseNamedFunction() *LetStatement {
+	fnToken := p.curToken
+	p.nextToken()
+	name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	p.curToken = fnToken
+	return &LetStatement{
+		Token: fnToken,
+		Name:  name,
+		Value: p.parseFunctionLiteral(),
+	}
 }
 
 func (p *Parser) parseFunctionParameters() []*Identifier {
@@ -988,16 +1012,8 @@ func (p *Parser) parseArrayIndexExpression(array Expression) Expression {
 }
 func (p *Parser) parseSwitchStatement() Statement {
 	stmt := &SwitchStatement{Token: p.curToken}
-	if !p.expectPeek(golexer.LPAREN) {
-		p.synchronize()
-		return nil
-	}
 	p.nextToken()
 	stmt.Expression = p.parseExpression(LOWEST)
-	if !p.expectPeek(golexer.RPAREN) {
-		p.synchronize()
-		return nil
-	}
 	if !p.expectPeek(golexer.LBRACE) {
 		p.synchronize()
 		return nil
@@ -1037,11 +1053,6 @@ func (p *Parser) parseForInStatement() Statement {
 	p.nextToken()
 	p.nextToken()
 	stmt.collection = p.parseExpression(LOWEST)
-	if !p.expectPeek(golexer.RPAREN) {
-		p.synchronize()
-		return nil
-	}
-
 	if !p.expectPeek(golexer.LBRACE) {
 		p.synchronize()
 		return nil
@@ -1072,4 +1083,16 @@ func (p *Parser) parseTableLiteral() Expression {
 		p.nextToken()
 	}
 	return exp
+}
+func (p *Parser) parseUseStament() *UseStatement {
+	stmt := &UseStatement{token: p.curToken}
+	if !p.peekTokenIs(golexer.STRING) {
+		p.synchronize()
+		return nil
+	}
+	stmt.FileName = &StringLiteral{
+		Token: p.curToken,
+		Value: p.curToken.Literal,
+	}
+	return stmt
 }

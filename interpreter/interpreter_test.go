@@ -22,10 +22,10 @@ func TestEvalProgram(t *testing.T) {
 		{"return 10; return 20;", "10", "first return wins"},
 
 		// error propagation
-		{"x + 5;", "ERROR: identifier not found: x", "error bubbles up"},
-		{"5 / 0;", "ERROR: division by zero", "division by zero error"},
-		{"5 % 0;", "ERROR: modulo by zero", "modulo by zero error"},
-		{"5 + true;", "ERROR: type mismatch: INTEGER + BOOLEAN", "type mismatch error"},
+		{"x + 5;", "ERROR [1:1]: identifier not found: x", "error bubbles up"},
+		{"5 / 0;", "ERROR [1:3]: division by zero", "division by zero error"},
+		{"5 % 0;", "ERROR [1:3]: modulo by zero", "modulo by zero error"},
+		{"5 + true;", "ERROR [1:3]: type mismatch: INTEGER + BOOLEAN", "type mismatch error"},
 	}
 
 	for _, tc := range testCases {
@@ -53,7 +53,7 @@ func TestFloatInfix(t *testing.T) {
 		{"5.0 - 2.5", "2.5", "float subtraction"},
 		{"5.0 * 2.0", "10", "float multiplication"},
 		{"5.0 / 2.0", "2.5", "float division"},
-		{"5.0 / 0.0", "ERROR: division by zero", "float division by zero"},
+		{"5.0 / 0.0", "ERROR [1:5]: division by zero", "float division by zero"},
 		{"5.0 == 5.0", "true", "float equality true"},
 		{"5.0 == 4.0", "false", "float equality false"},
 		{"5.0 != 4.0", "true", "float not equal"},
@@ -88,7 +88,7 @@ func TestStringInfix(t *testing.T) {
 		{`"hello" == "hello"`, "true", "string equality true"},
 		{`"hello" == "world"`, "false", "string equality false"},
 		{`"hello" != "world"`, "true", "string not equal"},
-		{`"hello" - "world"`, "ERROR: unknown operator: STRING - STRING", "invalid string operator"},
+		{`"hello" - "world"`, "ERROR [1:9]: unknown operator: STRING - STRING", "invalid string operator"},
 	}
 
 	for _, tc := range testCases {
@@ -114,8 +114,8 @@ func TestIntegerInfix(t *testing.T) {
 	}{
 		{"10 % 3", "1", "modulo basic"},
 		{"10 % 5", "0", "modulo even division"},
-		{"10 % 0", "ERROR: modulo by zero", "modulo by zero"},
-		{"10 / 0", "ERROR: division by zero", "division by zero"},
+		{"10 % 0", "ERROR [1:4]: modulo by zero", "modulo by zero"},
+		{"10 / 0", "ERROR [1:4]: division by zero", "division by zero"},
 		{"10 == 10", "true", "integer equality"},
 		{"10 != 5", "true", "integer not equal"},
 		{"10 >= 10", "true", "greater or equal"},
@@ -143,40 +143,40 @@ func TestIfExpression(t *testing.T) {
 		desc     string
 	}{
 		// basic truthy/falsy
-		{"if (true) { 10 }", "10", "true condition"},
-		{"if (false) { 10 }", "null", "false condition no alternative returns null"},
-		{"if (1) { 10 }", "10", "integer is truthy"},
-		{"if (null) { 10 }", "null", "null is falsy"},
+		{"if true { 10 }", "10", "true condition"},
+		{"if false { 10 }", "null", "false condition no alternative returns null"},
+		{"if 1 { 10 }", "10", "integer is truthy"},
+		{"if null { 10 }", "null", "null is falsy"},
 
 		// with else
-		{"if (true) { 10 } else { 20 }", "10", "true takes consequence"},
-		{"if (false) { 10 } else { 20 }", "20", "false takes alternative"},
+		{"if true { 10 } else { 20 }", "10", "true takes consequence"},
+		{"if false { 10 } else { 20 }", "20", "false takes alternative"},
 
 		// condition is expression
-		{"if (5 > 3) { 10 }", "10", "expression condition true"},
-		{"if (5 < 3) { 10 } else { 20 }", "20", "expression condition false"},
-		{"if (5 == 5) { 10 }", "10", "equality condition"},
+		{"if 5 > 3 { 10 }", "10", "expression condition true"},
+		{"if 5 < 3 { 10 } else { 20 }", "20", "expression condition false"},
+		{"if 5 == 5 { 10 }", "10", "equality condition"},
 
 		// condition uses variables
-		{"let x = 5; if (x > 3) { 10 }", "10", "variable in condition"},
-		{"let x = 1; if (x > 3) { 10 } else { 20 }", "20", "variable condition false"},
+		{"let x = 5; if x > 3 { 10 }", "10", "variable in condition"},
+		{"let x = 1; if x > 3 { 10 } else { 20 }", "20", "variable condition false"},
 
 		// block returns last value
-		{"if (true) { 5; 10; 15; }", "15", "block returns last statement"},
-		{"if (false) { 5 } else { 10; 20; }", "20", "else block returns last statement"},
+		{"if true { 5; 10; 15; }", "15", "block returns last statement"},
+		{"if false { 5 } else { 10; 20; }", "20", "else block returns last statement"},
 
 		// early return inside block (stays wrapped)
-		{"if (true) { return 5; 10; }", "5", "return inside if stops block"},
-		{"if (false) { 10 } else { return 20; 30; }", "20", "return inside else stops block"},
+		{"if true { return 5; 10; }", "5", "return inside if stops block"},
+		{"if false { 10 } else { return 20; 30; }", "20", "return inside else stops block"},
 
 		// error in condition bubbles up
-		{"if (x) { 10 }", "ERROR: identifier not found: x", "error in condition bubbles up"},
-		{"if (5 + true) { 10 }", "ERROR: type mismatch: INTEGER + BOOLEAN", "type mismatch in condition"},
+		{"if x { 10 }", "ERROR [1:4]: identifier not found: x", "error in condition bubbles up"},
+		{"if 5 + true { 10 }", "ERROR [1:6]: type mismatch: INTEGER + BOOLEAN", "type mismatch in condition"},
 
 		// nested if
-		{"if (true) { if (true) { 10 } }", "10", "nested if"},
-		{"if (true) { if (false) { 10 } else { 20 } }", "20", "nested if else"},
-		{"if (true) { if (false) { 10 } }", "null", "nested if no alternative null"},
+		{"if true { if true { 10 } }", "10", "nested if"},
+		{"if true { if false { 10 } else { 20 } }", "20", "nested if else"},
+		{"if true { if false { 10 } }", "null", "nested if no alternative null"},
 	}
 
 	for _, tc := range testCases {
@@ -231,11 +231,11 @@ func TestEvalFunctionCalls(t *testing.T) {
 		{"let noParam = fn() { 5 }; noParam()", "5", "no param call"},
 		{"let f = fn(x) { 1; 2; x }; f(5)", "5", "implicit return is last value"},
 		{"let f = fn(x) { return x; 999 }; f(5)", "5", "explicit return exits early"},
-		{"notAFunction(5)", "ERROR: identifier not found: notAFunction", "undefined function"},
+		{"notAFunction(5)", "ERROR [1:1]: identifier not found: notAFunction", "undefined function"},
 		{"let x = 5; x(5)", "ERROR: not a function: INTEGER", "call non function"},
 		{"true(5)", "ERROR: not a function: BOOLEAN", "call boolean as function"},
-		{"let add = fn(x, y) { x + y }; add(x, 5)", "ERROR: identifier not found: x", "error in first arg"},
-		{"let add = fn(x, y) { x + y }; add(5, x)", "ERROR: identifier not found: x", "error in second arg"},
+		{"let add = fn(x, y) { x + y }; add(x, 5)", "ERROR [1:35]: identifier not found: x", "error in first arg"},
+		{"let add = fn(x, y) { x + y }; add(5, x)", "ERROR [1:38]: identifier not found: x", "error in second arg"},
 		{"let x = 10; let f = fn(x) { x }; f(5); x", "10", "function param doesnt leak to outer env"},
 	}
 
@@ -262,7 +262,7 @@ func TestApplyFunction(t *testing.T) {
 	}{
 		{
 			`let factorial = fn(n) {
-				if (n == 0) { return 1 }
+				if n == 0 { return 1 }
 				n * factorial(n - 1)
 			};
 			factorial(5)`,
@@ -271,7 +271,7 @@ func TestApplyFunction(t *testing.T) {
 		},
 		{
 			`let fib = fn(n) {
-				if (n <= 1) { return n }
+				if n <= 1 { return n }
 				fib(n - 1) + fib(n - 2)
 			};
 			fib(10)`,
@@ -358,8 +358,8 @@ func TestMinusPrefixOperator(t *testing.T) {
 		{"-0.0", "-0", "negate zero float"},
 
 		// errors
-		{"-true", "ERROR: unknown operator: -BOOLEAN", "negate boolean"},
-		{"-null", "ERROR: unknown operator: -NULL", "negate null"},
+		{"-true", "ERROR [1:1]: unknown operator: -BOOLEAN", "negate boolean"},
+		{"-null", "ERROR [1:1]: unknown operator: -NULL", "negate null"},
 	}
 
 	for _, tc := range testCases {
@@ -397,7 +397,7 @@ func TestArrayLiteral(t *testing.T) {
 		{"let x = 5; [x, x + 1]", "[5, 6]", "variable elements"},
 
 		// error in element bubbles up
-		{"[1, x, 3]", "ERROR: identifier not found: x", "error in element bubbles up"},
+		{"[1, x, 3]", "ERROR [1:5]: identifier not found: x", "error in element bubbles up"},
 
 		// nested arrays
 		{"[[1, 2], [3, 4]]", "[[1, 2], [3, 4]]", "nested arrays"},

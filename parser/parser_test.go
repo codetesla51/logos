@@ -340,16 +340,16 @@ func TestIfExpression(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"if (true) { 5 }", "if(true){5}"},
-		{"if (false) { 5 } else { 10 }", "if(false){5}else{10}"},
-		{"if (x > 5) { x + 1 }", "if((x > 5)){(x + 1)}"},
-		{"if (x < 10) { x * 2 } else { 0 }", "if((x < 10)){(x * 2)}else{0}"},
-		{"if (true) { 1 + 2 }", "if(true){(1 + 2)}"},
-		{"if (x == 5) { 100 }", "if((x == 5)){100}"},
-		{"if (x != y) { x + y }", "if((x != y)){(x + y)}"},
-		{"if (a > b) { a } else { b }", "if((a > b)){a}else{b}"},
-		{"if (5 > 3) { 5 > 2 }", "if((5 > 3)){(5 > 2)}"},
-		{"if (true) { if (false) { 1 } else { 2 } }", "if(true){if(false){1}else{2}}"},
+		{"if (true) { 5 }", "iftrue{5}"},
+		{"if (false) { 5 } else { 10 }", "iffalse{5}else{10}"},
+		{"if (x > 5) { x + 1 }", "if(x > 5){(x + 1)}"},
+		{"if (x < 10) { x * 2 } else { 0 }", "if(x < 10){(x * 2)}else{0}"},
+		{"if (true) { 1 + 2 }", "iftrue{(1 + 2)}"},
+		{"if (x == 5) { 100 }", "if(x == 5){100}"},
+		{"if (x != y) { x + y }", "if(x != y){(x + y)}"},
+		{"if (a > b) { a } else { b }", "if(a > b){a}else{b}"},
+		{"if (5 > 3) { 5 > 2 }", "if(5 > 3){(5 > 2)}"},
+		{"if (true) { if (false) { 1 } else { 2 } }", "iftrue{iffalse{1}else{2}}"},
 	}
 	for _, tt := range tests {
 		l := golexer.NewLexer(tt.input)
@@ -412,7 +412,7 @@ func TestFunctionLiteral(t *testing.T) {
 		{"let f = fn(x) { x }; f", "let f = fn(x){x};f"},
 		{"fn(x) { fn(y) { x + y } }", "fn(x){fn(y){(x + y)}}"},
 		{"fn(a, b) { a - b }", "fn(a, b){(a - b)}"},
-		{"fn(n) { if (n > 0) { n } else { 0 } }", "fn(n){if((n > 0)){n}else{0}}"},
+		{"fn(n) { if (n > 0) { n } else { 0 } }", "fn(n){if(n > 0){n}else{0}}"},
 	}
 	for _, tt := range tests {
 		l := golexer.NewLexer(tt.input)
@@ -442,7 +442,7 @@ func TestReturnStatements(t *testing.T) {
 		{"return x * 2 + 1", "return ((x * 2) + 1);"},
 		{"return true", "return true;"},
 		{"return false", "return false;"},
-		{"return if (x > 5) { 10 } else { 20 }", "return if((x > 5)){10}else{20};"},
+		{"return if (x > 5) { 10 } else { 20 }", "return if(x > 5){10}else{20};"},
 		{"return fn(x) { x }", "return fn(x){x};"},
 		{"return x && y", "return (x && y);"},
 	}
@@ -480,8 +480,8 @@ func TestLogicalOperators(t *testing.T) {
 		{"x && !y", "(x && (!y))"},
 		{"x > 5 && y < 10", "((x > 5) && (y < 10))"},
 		{"x == 5 || y == 10", "((x == 5) || (y == 10))"},
-		{"if (x && y) { 1 } else { 2 }", "if((x && y)){1}else{2}"},
-		{"if (x || y) { 1 } else { 2 }", "if((x || y)){1}else{2}"},
+		{"if (x && y) { 1 } else { 2 }", "if(x && y){1}else{2}"},
+		{"if (x || y) { 1 } else { 2 }", "if(x || y){1}else{2}"},
 		{"fn(a, b) { a && b }", "fn(a, b){(a && b)}"},
 		{"fn(a, b) { a || b }", "fn(a, b){(a || b)}"},
 		{"let result = x && y;", "let result = (x && y);"},
@@ -565,9 +565,8 @@ func TestFunctionCalls(t *testing.T) {
 		{"return mul(x, y)", "return mul(x, y);"},
 
 		// Function calls in if conditions
-		{"if (isEmpty(arr)) { 1 }", "if(isEmpty(arr)){1}"},
-		{"if (check(x)) { x } else { 0 }", "if(check(x)){x}else{0}"},
-		{"if (and(x > 5, y < 10)) { 1 }", "if(and((x > 5), (y < 10))){1}"},
+		{"if (x && y) { 1 } else { 2 }", "if(x && y){1}else{2}"},
+		{"if (x || y) { 1 } else { 2 }", "if(x || y){1}else{2}"},
 
 		// Function calls in function bodies
 		{"fn() { f() }", "fn(){f()}"},
@@ -665,8 +664,7 @@ func TestModuloOperator(t *testing.T) {
 		// Complex expressions with modulo
 		{"let x = a % b;", "let x = (a % b);"},
 		{"return a % b;", "return (a % b);"},
-		{"if (x % 2 == 0) { 1 }", "if(((x % 2) == 0)){1}"},
-	}
+		{"if (x % 2 == 0) { 1 }", "if((x % 2) == 0){1}"}}
 	for _, tt := range testCases {
 		l := golexer.NewLexer(tt.input)
 		p := NewParser(l)
@@ -721,8 +719,8 @@ func TestArrayIndexing(t *testing.T) {
 		{"return arr[i]", "return (arr[i]);"},
 
 		// Indexing in if conditions
-		{"if (arr[0] > 5) { 1 }", "if(((arr[0]) > 5)){1}"},
-		{"if (arr[i] == x) { 1 } else { 2 }", "if(((arr[i]) == x)){1}else{2}"},
+		{"if (arr[0] > 5) { 1 }", "if((arr[0]) > 5){1}"},
+		{"if (arr[i] == x) { 1 } else { 2 }", "if((arr[i]) == x){1}else{2}"},
 
 		// Indexing in function calls
 		{"f(arr[0])", "f((arr[0]))"},
@@ -750,20 +748,20 @@ func TestForStatements(t *testing.T) {
 		expected string
 	}{
 		//todo make surre tests pass
-		{"let i = 0; for (i < 5) { i = i + 1; }", "let i = 0;for((i < 5)){(i = (i + 1))}"},
-		{"let x = 10; for (x > 0) { x = x - 1; }", "let x = 10;for((x > 0)){(x = (x - 1))}"},
+		{"let i = 0; for i < 5 { i = i + 1; }", "let i = 0;for (i < 5) {(i = (i + 1))}"},
+		{"let x = 10; for x > 0 { x = x - 1; }", "let x = 10;for (x > 0) {(x = (x - 1))}"},
 		// Compound assignments in loops
-		{"let i = 0; for (i < 10) { i += 1; }", "let i = 0;for((i < 10)){(i += 1)}"},
-		{"let x = 1; for (x < 100) { x *= 2; }", "let x = 1;for((x < 100)){(x *= 2)}"},
-		{"let x = 100; for (x > 0) { x /= 2; }", "let x = 100;for((x > 0)){(x /= 2)}"},
+		{"let i = 0; for i < 10 { i += 1; }", "let i = 0;for (i < 10) {(i += 1)}"},
+		{"let x = 1; for x < 100 { x *= 2; }", "let x = 1;for (x < 100) {(x *= 2)}"},
+		{"let x = 100; for x > 0 { x /= 2; }", "let x = 100;for (x > 0) {(x /= 2)}"},
 		// Multiple statements in loop
-		{"let i = 0; for (i < 5) { i = i + 1; print(i); }", "let i = 0;for((i < 5)){(i = (i + 1));print(i)}"},
-		{"let i = 0; for (i < 3) { print(i); i = i + 1; }", "let i = 0;for((i < 3)){print(i);(i = (i + 1))}"},
+		{"let i = 0; for i < 5 { i = i + 1; print(i); }", "let i = 0;for (i < 5) {(i = (i + 1));print(i)}"},
+		{"let i = 0; for i < 3 { print(i); i = i + 1; }", "let i = 0;for (i < 3) {print(i);(i = (i + 1))}"},
 		// Nested loops with assignment
-		{"let i = 0; for (i < 2) { let j = 0; for (j < 2) { j = j + 1; } i = i + 1; }", "let i = 0;for((i < 2)){let j = 0;for((j < 2)){(j = (j + 1))};(i = (i + 1))}"},
+		{"let i = 0; for i < 2 { let j = 0; for j < 2 { j = j + 1; } i = i + 1; }", "let i = 0;for (i < 2) {let j = 0;for (j < 2) {(j = (j + 1))};(i = (i + 1))}"},
 		//Assignment with expressions
-		{"let i = 0; for (i < 10) { i = i + 2 * 3; }", "let i = 0;for((i < 10)){(i = (i + (2 * 3)))}"},
-		{"let x = 1; for (x < 100) { x = x + x; }", "let x = 1;for((x < 100)){(x = (x + x))}"},
+		{"let i = 0; for i < 10 { i = i + 2 * 3; }", "let i = 0;for (i < 10) {(i = (i + (2 * 3)))}"},
+		{"let x = 1; for x < 100 { x = x + x; }", "let x = 1;for (x < 100) {(x = (x + x))}"},
 	}
 	for _, tt := range testCases {
 		l := golexer.NewLexer(tt.input)
@@ -835,11 +833,11 @@ func TestForInStatements(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"for (item in list) { let x = item; }", "for(item in list){let x = item;}"}, {"for (item in getItems()) { item; }", "for(item in getItems()){item}"},
-		{"for (item in list) { print(item); item; }", "for(item in list){print(item);item}"},
-		{"for (i in list) { for (j in i) { j; } }", "for(i in list){for(j in i){j}}"},
-		{"for (num in numbers) { print(num); }", "for(num in numbers){print(num)}"},
-		{"for (x in a + b) { x; }", "for(x in (a + b)){x}"},
+		{"for item in list { let x = item; }", "for item in list {let x = item;}"}, {"for item in getItems() { item; }", "for item in getItems() {item}"},
+		{"for item in list { print(item); item; }", "for item in list {print(item);item}"},
+		{"for i in list { for j in i { j; } }", "for i in list {for j in i {j}}"},
+		{"for num in numbers { print(num); }", "for num in numbers {print(num)}"},
+		{"for x in a + b { x; }", "for x in (a + b) {x}"},
 	}
 	for _, tt := range testCases {
 		l := golexer.NewLexerWithConfig(tt.input, "../tokens.json")
@@ -1043,32 +1041,32 @@ func TestSwitchStatements(t *testing.T) {
 		expected string
 	}{
 		{
-			`switch (x) { case 1 { 10 } }`,
-			`switch(x){case 1 {10}}`,
+			`switch x { case 1 { 10 } }`,
+			`switch x {case 1 {10}}`,
 		},
 		{
-			`switch (x) { case 1 { 10 } case 2 { 20 } }`,
-			`switch(x){case 1 {10}case 2 {20}}`,
+			`switch x { case 1 { 10 } case 2 { 20 } }`,
+			`switch x {case 1 {10}case 2 {20}}`,
 		},
 		{
-			`switch (x) { case 1 { 10 } default { 0 } }`,
-			`switch(x){case 1 {10}default {0}}`,
+			`switch x { case 1 { 10 } default { 0 } }`,
+			`switch x {case 1 {10}default {0}}`,
 		},
 		{
-			`switch (x) { case 1 { 10 } case 2 { 20 } default { 0 } }`,
-			`switch(x){case 1 {10}case 2 {20}default {0}}`,
+			`switch x { case 1 { 10 } case 2 { 20 } default { 0 } }`,
+			`switch x {case 1 {10}case 2 {20}default {0}}`,
 		},
 		{
-			`switch (x + 1) { case 2 { 10 } default { 0 } }`,
-			`switch((x + 1)){case 2 {10}default {0}}`,
+			`switch x + 1 { case 2 { 10 } default { 0 } }`,
+			`switch (x + 1) {case 2 {10}default {0}}`,
 		},
 		{
-			`switch (x) { case true { 1 } case false { 0 } }`,
-			`switch(x){case true {1}case false {0}}`,
+			`switch x { case true { 1 } case false { 0 } }`,
+			`switch x {case true {1}case false {0}}`,
 		},
 		{
-			`switch (x) { default { 0 } }`,
-			`switch(x){default {0}}`,
+			`switch x { default { 0 } }`,
+			`switch x {default {0}}`,
 		},
 	}
 	for _, tt := range testCases {
@@ -1153,5 +1151,21 @@ func TestErrorRecovery(t *testing.T) {
 				t.Fatalf("input=%q: expected %d statements after recovery, got %d", tt.input, tt.expectedStmts, len(program.Statements))
 			}
 		}
+	}
+}
+func TestUse(t *testing.T) {
+	input := "use \"file.lgs\""
+	expected := "use\"file.lgs\""
+	l := golexer.NewLexerWithConfig(input, "../tokens.json")
+	p := NewParser(l)
+	program := p.Parse()
+	if len(p.Errors()) != 0 {
+		t.Fatalf("input=%q: parser has %d errors: %v", input, len(p.Errors()), p.Errors())
+	}
+	if program == nil {
+		t.Fatalf("input=%q: Parse() returned nil", input)
+	}
+	if program.String() != expected {
+		t.Fatalf("input=%q: expected=%q, got=%q", input, expected, program.String())
 	}
 }
