@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,7 +19,35 @@ import (
 
 var builtins = map[string]*Builtin{}
 
+// -------------------------
+// RESULT HELPERS
+// -------------------------
+
+// okResult wraps a successful value in a result table {ok: true, value: v, error: ""}
+func okResult(value Object) Object {
+	return &Table{Pairs: map[string]Object{
+		"STRING:ok":    TRUE,
+		"STRING:value": value,
+		"STRING:error": &String{Value: ""},
+	}}
+}
+
+// errResult wraps a failure in a result table {ok: false, value: null, error: msg}
+func errResult(msg string, args ...interface{}) Object {
+	return &Table{Pairs: map[string]Object{
+		"STRING:ok":    FALSE,
+		"STRING:value": NULL,
+		"STRING:error": &String{Value: fmt.Sprintf(msg, args...)},
+	}}
+}
+
 func init() {
+
+	// -------------------------
+	// I/O
+	// -------------------------
+
+	// print(args...) - prints values to stdout separated by spaces
 	builtins["print"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			var out strings.Builder
@@ -32,31 +62,7 @@ func init() {
 		},
 	}
 
-	builtins["type"] = &Builtin{
-		Fn: func(args ...Object) Object {
-			if len(args) != 1 {
-				return newError("type() takes exactly 1 argument, got %d", len(args))
-			}
-			return &String{Value: string(args[0].Type())}
-		},
-	}
-
-	builtins["len"] = &Builtin{
-		Fn: func(args ...Object) Object {
-			if len(args) != 1 {
-				return newError("len() takes exactly 1 argument, got %d", len(args))
-			}
-			switch arg := args[0].(type) {
-			case *String:
-				return &Integer{Value: int64(len(arg.Value))}
-			case *Array:
-				return &Integer{Value: int64(len(arg.Elements))}
-			default:
-				return newError("len() not supported for %s", args[0].Type())
-			}
-		},
-	}
-
+	// input(prompt?) - reads a line from stdin, optional prompt string
 	builtins["input"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) > 1 {
@@ -74,86 +80,232 @@ func init() {
 		},
 	}
 
+	// prompt(message) - prints message then reads a line from stdin
+	builtins["prompt"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("prompt() takes 1 argument, got %d", len(args))
+			}
+			fmt.Print(args[0].String())
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			if err := scanner.Err(); err != nil {
+				return newError("prompt() error: %s", err.Error())
+			}
+			return &String{Value: scanner.Text()}
+		},
+	}
+
+	// clear() - clears the terminal screen
+	builtins["clear"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 0 {
+				return newError("clear() takes no arguments, got %d", len(args))
+			}
+			fmt.Print("\033[H\033[2J")
+			return NULL
+		},
+	}
+
+	// -------------------------
+	// COLOR OUTPUT
+	// -------------------------
+
+	// colorRed(str) - returns string wrapped in red ANSI color codes
+	builtins["colorRed"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorRed() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[31m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorGreen(str) - returns string wrapped in green ANSI color codes
+	builtins["colorGreen"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorGreen() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[32m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorYellow(str) - returns string wrapped in yellow ANSI color codes
+	builtins["colorYellow"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorYellow() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[33m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorBlue(str) - returns string wrapped in blue ANSI color codes
+	builtins["colorBlue"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorBlue() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[34m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorMagenta(str) - returns string wrapped in magenta ANSI color codes
+	builtins["colorMagenta"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorMagenta() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[35m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorCyan(str) - returns string wrapped in cyan ANSI color codes
+	builtins["colorCyan"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorCyan() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[36m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorWhite(str) - returns string wrapped in white ANSI color codes
+	builtins["colorWhite"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorWhite() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[37m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// colorBold(str) - returns string wrapped in bold ANSI codes
+	builtins["colorBold"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("colorBold() takes 1 argument, got %d", len(args))
+			}
+			return &String{Value: "\033[1m" + args[0].String() + "\033[0m"}
+		},
+	}
+
+	// -------------------------
+	// TYPE
+	// -------------------------
+
+	// type(value) - returns the type name of a value as a string
+	builtins["type"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("type() takes exactly 1 argument, got %d", len(args))
+			}
+			return &String{Value: string(args[0].Type())}
+		},
+	}
+
+	// -------------------------
+	// LENGTH
+	// -------------------------
+
+	// len(value) - returns the length of a string or array
+	builtins["len"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("len() takes exactly 1 argument, got %d", len(args))
+			}
+			switch arg := args[0].(type) {
+			case *String:
+				return &Integer{Value: int64(len(arg.Value))}
+			case *Array:
+				return &Integer{Value: int64(len(arg.Elements))}
+			default:
+				return newError("len() not supported for %s", args[0].Type())
+			}
+		},
+	}
+
 	// -------------------------
 	// FILE OPS
 	// -------------------------
 
-	// read(filepath) - reads file, returns null if not found
-	builtins["read"] = &Builtin{
+	// fileRead(path) - reads a file and returns {ok, value, error}
+	builtins["fileRead"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("read() takes exactly 1 argument, got %d", len(args))
+				return newError("fileRead() takes exactly 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("read() argument must be a string (filepath)")
+				return newError("fileRead() argument must be a string (filepath)")
 			}
 			data, err := os.ReadFile(path.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileRead() failed: %s", err.Error())
 			}
-			return &String{Value: string(data)}
+			return okResult(&String{Value: string(data)})
 		},
 	}
 
-	// write(filepath, content) - overwrites file with content
-	builtins["write"] = &Builtin{
+	// fileWrite(path, content) - overwrites a file, returns {ok, value, error}
+	builtins["fileWrite"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("write() takes 2 arguments, got %d", len(args))
+				return newError("fileWrite() takes 2 arguments, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("write() first argument must be a string (filepath)")
+				return newError("fileWrite() first argument must be a string (filepath)")
 			}
 			content, ok := args[1].(*String)
 			if !ok {
-				return newError("write() second argument must be a string")
+				return newError("fileWrite() second argument must be a string")
 			}
 			err := os.WriteFile(path.Value, []byte(content.Value), 0644)
 			if err != nil {
-				return NULL
+				return errResult("fileWrite() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// append(filepath, content) - appends content to a file
-	builtins["append"] = &Builtin{
+	// fileAppend(path, content) - appends content to a file, returns {ok, value, error}
+	builtins["fileAppend"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("append() takes 2 arguments, got %d", len(args))
+				return newError("fileAppend() takes 2 arguments, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("append() first argument must be a string (filepath)")
+				return newError("fileAppend() first argument must be a string (filepath)")
 			}
 			content, ok := args[1].(*String)
 			if !ok {
-				return newError("append() second argument must be a string")
+				return newError("fileAppend() second argument must be a string")
 			}
 			f, err := os.OpenFile(path.Value, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				return NULL
+				return errResult("fileAppend() failed: %s", err.Error())
 			}
 			defer f.Close()
 			_, err = f.WriteString(content.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileAppend() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// exists(path) - returns true if file or folder exists, false otherwise
-	builtins["exists"] = &Builtin{
+	// fileExists(path) - returns true if file or folder exists, false otherwise
+	builtins["fileExists"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("exists() takes 1 argument, got %d", len(args))
+				return newError("fileExists() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("exists() argument must be a string (filepath)")
+				return newError("fileExists() argument must be a string (filepath)")
 			}
 			_, err := os.Stat(path.Value)
 			if os.IsNotExist(err) {
@@ -163,215 +315,229 @@ func init() {
 		},
 	}
 
-	// delete(path) - deletes a file or empty folder, returns null on failure
-	builtins["delete"] = &Builtin{
+	// fileDelete(path) - deletes a file or empty folder, returns {ok, value, error}
+	builtins["fileDelete"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("delete() takes 1 argument, got %d", len(args))
+				return newError("fileDelete() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("delete() argument must be a string (filepath)")
+				return newError("fileDelete() argument must be a string (filepath)")
 			}
 			err := os.Remove(path.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileDelete() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// deleteAll(path) - deletes folder and everything inside, returns null on failure
-	builtins["deleteAll"] = &Builtin{
+	// fileDeleteAll(path) - deletes a folder and all its contents, returns {ok, value, error}
+	builtins["fileDeleteAll"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("deleteAll() takes 1 argument, got %d", len(args))
+				return newError("fileDeleteAll() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("deleteAll() argument must be a string (folderpath)")
+				return newError("fileDeleteAll() argument must be a string (folderpath)")
 			}
 			err := os.RemoveAll(path.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileDeleteAll() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// rename(oldpath, newpath) - renames or moves a file or folder
-	builtins["rename"] = &Builtin{
+	// fileRename(oldPath, newPath) - renames or moves a file/folder, returns {ok, value, error}
+	builtins["fileRename"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("rename() takes 2 arguments, got %d", len(args))
+				return newError("fileRename() takes 2 arguments, got %d", len(args))
 			}
 			oldPath, ok := args[0].(*String)
 			if !ok {
-				return newError("rename() first argument must be a string")
+				return newError("fileRename() first argument must be a string")
 			}
 			newPath, ok := args[1].(*String)
 			if !ok {
-				return newError("rename() second argument must be a string")
+				return newError("fileRename() second argument must be a string")
 			}
 			err := os.Rename(oldPath.Value, newPath.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileRename() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// mkdir(path) - creates folder and any missing parents
-	builtins["mkdir"] = &Builtin{
+	// fileMkdir(path) - creates a folder and any missing parents, returns {ok, value, error}
+	builtins["fileMkdir"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("mkdir() takes 1 argument, got %d", len(args))
+				return newError("fileMkdir() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("mkdir() argument must be a string (folderpath)")
+				return newError("fileMkdir() argument must be a string (folderpath)")
 			}
 			err := os.MkdirAll(path.Value, 0755)
 			if err != nil {
-				return NULL
+				return errResult("fileMkdir() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// rmdir(path) - removes an empty directory
-	builtins["rmdir"] = &Builtin{
+	// fileRmdir(path) - removes an empty directory, returns {ok, value, error}
+	builtins["fileRmdir"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("rmdir() takes 1 argument, got %d", len(args))
+				return newError("fileRmdir() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("rmdir() argument must be a string (folderpath)")
+				return newError("fileRmdir() argument must be a string (folderpath)")
 			}
 			err := os.Remove(path.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileRmdir() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// readDir(path) - returns array of file/folder names in directory, null on failure
-	builtins["readDir"] = &Builtin{
+	// fileReadDir(path) - returns array of file/folder names in directory, returns {ok, value, error}
+	builtins["fileReadDir"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("readDir() takes 1 argument, got %d", len(args))
+				return newError("fileReadDir() takes 1 argument, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("readDir() argument must be a string (folderpath)")
+				return newError("fileReadDir() argument must be a string (folderpath)")
 			}
 			entries, err := os.ReadDir(path.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileReadDir() failed: %s", err.Error())
 			}
 			items := make([]Object, len(entries))
 			for i, entry := range entries {
 				items[i] = &String{Value: entry.Name()}
 			}
-			return &Array{Elements: items}
+			return okResult(&Array{Elements: items})
 		},
 	}
 
-	// cp(src, dst) - copies a file from src to dst
-	builtins["cp"] = &Builtin{
+	// fileCopy(src, dst) - copies a file from src to dst, returns {ok, value, error}
+	builtins["fileCopy"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("cp() takes 2 arguments, got %d", len(args))
+				return newError("fileCopy() takes 2 arguments, got %d", len(args))
 			}
 			src, ok := args[0].(*String)
 			if !ok {
-				return newError("cp() first argument must be a string (source path)")
+				return newError("fileCopy() first argument must be a string (source path)")
 			}
 			dst, ok := args[1].(*String)
 			if !ok {
-				return newError("cp() second argument must be a string (destination path)")
+				return newError("fileCopy() second argument must be a string (destination path)")
 			}
 			data, err := os.ReadFile(src.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileCopy() failed to read source: %s", err.Error())
 			}
 			err = os.WriteFile(dst.Value, data, 0644)
 			if err != nil {
-				return NULL
+				return errResult("fileCopy() failed to write destination: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// mv(src, dst) - moves a file or folder from src to dst
-	builtins["mv"] = &Builtin{
+	// fileMove(src, dst) - moves a file or folder from src to dst, returns {ok, value, error}
+	builtins["fileMove"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("mv() takes 2 arguments, got %d", len(args))
+				return newError("fileMove() takes 2 arguments, got %d", len(args))
 			}
 			src, ok := args[0].(*String)
 			if !ok {
-				return newError("mv() first argument must be a string (source path)")
+				return newError("fileMove() first argument must be a string (source path)")
 			}
 			dst, ok := args[1].(*String)
 			if !ok {
-				return newError("mv() second argument must be a string (destination path)")
+				return newError("fileMove() second argument must be a string (destination path)")
 			}
 			err := os.Rename(src.Value, dst.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileMove() failed: %s", err.Error())
 			}
-			return TRUE
+			return okResult(NULL)
 		},
 	}
 
-	// chmod(path, mode) - changes file permissions, mode is octal string e.g "0755"
-	builtins["chmod"] = &Builtin{
+	// fileChmod(path, mode) - changes file permissions, mode is octal string e.g "0755"
+	builtins["fileChmod"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
-				return newError("chmod() takes 2 arguments, got %d", len(args))
+				return newError("fileChmod() takes 2 arguments, got %d", len(args))
 			}
 			path, ok := args[0].(*String)
 			if !ok {
-				return newError("chmod() first argument must be a string (filepath)")
+				return newError("fileChmod() first argument must be a string (filepath)")
 			}
 			modeStr, ok := args[1].(*String)
 			if !ok {
-				return newError("chmod() second argument must be a string (e.g \"0755\")")
+				return newError("fileChmod() second argument must be a string (e.g \"0755\")")
 			}
 			mode, err := strconv.ParseUint(modeStr.Value, 8, 32)
 			if err != nil {
-				return newError("chmod() invalid mode \"%s\", use octal like \"0755\"", modeStr.Value)
+				return newError("fileChmod() invalid mode \"%s\", use octal like \"0755\"", modeStr.Value)
 			}
 			err = os.Chmod(path.Value, os.FileMode(mode))
 			if err != nil {
-				return NULL
+				return errResult("fileChmod() failed: %s", err.Error())
 			}
-			return NULL
+			return okResult(NULL)
 		},
 	}
 
-	// glob(pattern) - returns array of paths matching pattern, null on error
-	builtins["glob"] = &Builtin{
+	// fileGlob(pattern) - returns array of paths matching a glob pattern e.g "*.txt"
+	builtins["fileGlob"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return newError("glob() takes 1 argument, got %d", len(args))
+				return newError("fileGlob() takes 1 argument, got %d", len(args))
 			}
 			pattern, ok := args[0].(*String)
 			if !ok {
-				return newError("glob() argument must be a string (pattern)")
+				return newError("fileGlob() argument must be a string (pattern)")
 			}
 			matches, err := filepath.Glob(pattern.Value)
 			if err != nil {
-				return NULL
+				return errResult("fileGlob() failed: %s", err.Error())
 			}
 			items := make([]Object, len(matches))
 			for i, m := range matches {
 				items[i] = &String{Value: m}
 			}
-			return &Array{Elements: items}
+			return okResult(&Array{Elements: items})
+		},
+	}
+
+	// fileExt(path) - returns the file extension of a path e.g ".txt"
+	builtins["fileExt"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("fileExt() takes 1 argument, got %d", len(args))
+			}
+			path, ok := args[0].(*String)
+			if !ok {
+				return newError("fileExt() argument must be a string (filepath)")
+			}
+			return &String{Value: filepath.Ext(path.Value)}
 		},
 	}
 
@@ -379,6 +545,7 @@ func init() {
 	// STRING OPS
 	// -------------------------
 
+	// upper(str) - returns string converted to uppercase
 	builtins["upper"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -392,6 +559,7 @@ func init() {
 		},
 	}
 
+	// lower(str) - returns string converted to lowercase
 	builtins["lower"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -405,6 +573,7 @@ func init() {
 		},
 	}
 
+	// trim(str) - removes leading and trailing whitespace
 	builtins["trim"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -418,6 +587,7 @@ func init() {
 		},
 	}
 
+	// replace(str, old, new) - replaces all occurrences of old with new
 	builtins["replace"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 3 {
@@ -439,6 +609,7 @@ func init() {
 		},
 	}
 
+	// split(str, delimiter) - splits a string into an array by delimiter
 	builtins["split"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -461,6 +632,7 @@ func init() {
 		},
 	}
 
+	// join(array, delimiter) - joins an array of strings into one string
 	builtins["join"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -482,6 +654,7 @@ func init() {
 		},
 	}
 
+	// contains(str|array, value) - returns true if string contains substring or array contains value
 	builtins["contains"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -510,6 +683,7 @@ func init() {
 		},
 	}
 
+	// startsWith(str, prefix) - returns true if string starts with prefix
 	builtins["startsWith"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -530,6 +704,7 @@ func init() {
 		},
 	}
 
+	// endsWith(str, suffix) - returns true if string ends with suffix
 	builtins["endsWith"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -550,6 +725,7 @@ func init() {
 		},
 	}
 
+	// indexOf(str, substr) - returns index of first occurrence, or -1 if not found
 	builtins["indexOf"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -567,6 +743,7 @@ func init() {
 		},
 	}
 
+	// repeat(str, n) - repeats a string n times
 	builtins["repeat"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -584,10 +761,75 @@ func init() {
 		},
 	}
 
+	// slice(str|array, start, end) - returns substring or sub-array from start to end (exclusive)
+	builtins["slice"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 {
+				return newError("slice() takes 3 arguments, got %d", len(args))
+			}
+			start, ok := args[1].(*Integer)
+			if !ok {
+				return newError("slice() second argument must be an integer (start)")
+			}
+			end, ok := args[2].(*Integer)
+			if !ok {
+				return newError("slice() third argument must be an integer (end)")
+			}
+			switch arg := args[0].(type) {
+			case *String:
+				s := int(start.Value)
+				e := int(end.Value)
+				if s < 0 || e > len(arg.Value) || s > e {
+					return newError("slice() index out of bounds")
+				}
+				return &String{Value: arg.Value[s:e]}
+			case *Array:
+				s := int(start.Value)
+				e := int(end.Value)
+				if s < 0 || e > len(arg.Elements) || s > e {
+					return newError("slice() index out of bounds")
+				}
+				newElements := make([]Object, e-s)
+				copy(newElements, arg.Elements[s:e])
+				return &Array{Elements: newElements}
+			default:
+				return newError("slice() first argument must be a string or array")
+			}
+		},
+	}
+
+	// format(template, args...) - formats a string using %s %d %f placeholders
+	builtins["format"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError("format() takes at least 1 argument, got %d", len(args))
+			}
+			template, ok := args[0].(*String)
+			if !ok {
+				return newError("format() first argument must be a string (template)")
+			}
+			fmtArgs := make([]interface{}, len(args)-1)
+			for i, arg := range args[1:] {
+				switch v := arg.(type) {
+				case *Integer:
+					fmtArgs[i] = v.Value
+				case *Float:
+					fmtArgs[i] = v.Value
+				case *Bool:
+					fmtArgs[i] = v.Value
+				default:
+					fmtArgs[i] = arg.String()
+				}
+			}
+			return &String{Value: fmt.Sprintf(template.Value, fmtArgs...)}
+		},
+	}
+
 	// -------------------------
 	// TYPE CONVERSION
 	// -------------------------
 
+	// toInt(value) - converts a value to an integer, returns null on failure
 	builtins["toInt"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -615,6 +857,7 @@ func init() {
 		},
 	}
 
+	// toFloat(value) - converts a value to a float, returns null on failure
 	builtins["toFloat"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -642,6 +885,7 @@ func init() {
 		},
 	}
 
+	// toBool(value) - converts a value to a boolean, returns null on failure
 	builtins["toBool"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -673,6 +917,7 @@ func init() {
 		},
 	}
 
+	// toStr(value) - converts any value to its string representation
 	builtins["toStr"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -686,6 +931,7 @@ func init() {
 	// ARRAY OPS
 	// -------------------------
 
+	// push(array, value) - returns new array with value added to the end
 	builtins["push"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -702,6 +948,7 @@ func init() {
 		},
 	}
 
+	// pop(array) - returns the last element of an array, null if empty
 	builtins["pop"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -718,6 +965,7 @@ func init() {
 		},
 	}
 
+	// first(array) - returns the first element of an array, null if empty
 	builtins["first"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -734,6 +982,7 @@ func init() {
 		},
 	}
 
+	// last(array) - returns the last element of an array, null if empty
 	builtins["last"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -750,6 +999,7 @@ func init() {
 		},
 	}
 
+	// tail(array) - returns all elements except the first, null if empty
 	builtins["tail"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -768,6 +1018,7 @@ func init() {
 		},
 	}
 
+	// prepend(array, value) - returns new array with value added to the front
 	builtins["prepend"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -784,6 +1035,7 @@ func init() {
 		},
 	}
 
+	// reverse(array) - returns a new array with elements in reverse order
 	builtins["reverse"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -805,6 +1057,7 @@ func init() {
 	// TABLE OPS
 	// -------------------------
 
+	// keys(table) - returns all keys of a table as an array
 	builtins["keys"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -816,7 +1069,6 @@ func init() {
 			}
 			items := make([]Object, 0, len(table.Pairs))
 			for k := range table.Pairs {
-				// strip the "TYPE:" prefix to get the real key
 				parts := strings.SplitN(k, ":", 2)
 				if len(parts) == 2 {
 					items = append(items, &String{Value: parts[1]})
@@ -828,6 +1080,7 @@ func init() {
 		},
 	}
 
+	// values(table) - returns all values of a table as an array
 	builtins["values"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -845,6 +1098,7 @@ func init() {
 		},
 	}
 
+	// has(table, key) - returns true if table has the given key
 	builtins["has"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -866,6 +1120,7 @@ func init() {
 		},
 	}
 
+	// tableDelete(table, key) - returns new table without the specified key
 	builtins["tableDelete"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -889,6 +1144,7 @@ func init() {
 		},
 	}
 
+	// merge(table1, table2) - merges two tables, table2 values overwrite table1 on conflict
 	builtins["merge"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -917,7 +1173,7 @@ func init() {
 	// JSON
 	// -------------------------
 
-	// parseJson(string) - parses a JSON string into a table/array/value, null on failure
+	// parseJson(str) - parses a JSON string into a table/array/value, returns null on failure
 	builtins["parseJson"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -935,7 +1191,7 @@ func init() {
 		},
 	}
 
-	// toJson(value) - converts a table/array/value to a JSON string, null on failure
+	// toJson(value) - converts a value to a JSON string, returns null on failure
 	builtins["toJson"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -951,9 +1207,176 @@ func init() {
 	}
 
 	// -------------------------
+	// MATH
+	// -------------------------
+
+	// mathAbs(n) - returns the absolute value of a number
+	builtins["mathAbs"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("mathAbs() takes 1 argument, got %d", len(args))
+			}
+			switch arg := args[0].(type) {
+			case *Integer:
+				if arg.Value < 0 {
+					return &Integer{Value: -arg.Value}
+				}
+				return arg
+			case *Float:
+				return &Float{Value: math.Abs(arg.Value)}
+			default:
+				return newError("mathAbs() argument must be a number")
+			}
+		},
+	}
+
+	// mathPow(base, exp) - returns base raised to the power of exp
+	builtins["mathPow"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError("mathPow() takes 2 arguments, got %d", len(args))
+			}
+			base := toFloat64(args[0])
+			if base == nil {
+				return newError("mathPow() first argument must be a number")
+			}
+			exp := toFloat64(args[1])
+			if exp == nil {
+				return newError("mathPow() second argument must be a number")
+			}
+			return &Float{Value: math.Pow(*base, *exp)}
+		},
+	}
+
+	// mathSqrt(n) - returns the square root of a number
+	builtins["mathSqrt"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("mathSqrt() takes 1 argument, got %d", len(args))
+			}
+			n := toFloat64(args[0])
+			if n == nil {
+				return newError("mathSqrt() argument must be a number")
+			}
+			return &Float{Value: math.Sqrt(*n)}
+		},
+	}
+
+	// mathFloor(n) - rounds a number down to the nearest integer
+	builtins["mathFloor"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("mathFloor() takes 1 argument, got %d", len(args))
+			}
+			n := toFloat64(args[0])
+			if n == nil {
+				return newError("mathFloor() argument must be a number")
+			}
+			return &Integer{Value: int64(math.Floor(*n))}
+		},
+	}
+
+	// mathCeil(n) - rounds a number up to the nearest integer
+	builtins["mathCeil"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("mathCeil() takes 1 argument, got %d", len(args))
+			}
+			n := toFloat64(args[0])
+			if n == nil {
+				return newError("mathCeil() argument must be a number")
+			}
+			return &Integer{Value: int64(math.Ceil(*n))}
+		},
+	}
+
+	// mathRound(n) - rounds a number to the nearest integer
+	builtins["mathRound"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("mathRound() takes 1 argument, got %d", len(args))
+			}
+			n := toFloat64(args[0])
+			if n == nil {
+				return newError("mathRound() argument must be a number")
+			}
+			return &Integer{Value: int64(math.Round(*n))}
+		},
+	}
+
+	// mathMin(a, b) - returns the smaller of two numbers
+	builtins["mathMin"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError("mathMin() takes 2 arguments, got %d", len(args))
+			}
+			a := toFloat64(args[0])
+			b := toFloat64(args[1])
+			if a == nil || b == nil {
+				return newError("mathMin() arguments must be numbers")
+			}
+			return &Float{Value: math.Min(*a, *b)}
+		},
+	}
+
+	// mathMax(a, b) - returns the larger of two numbers
+	builtins["mathMax"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError("mathMax() takes 2 arguments, got %d", len(args))
+			}
+			a := toFloat64(args[0])
+			b := toFloat64(args[1])
+			if a == nil || b == nil {
+				return newError("mathMax() arguments must be numbers")
+			}
+			return &Float{Value: math.Max(*a, *b)}
+		},
+	}
+
+	// mathRandom() - returns a random float between 0.0 and 1.0
+	builtins["mathRandom"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 0 {
+				return newError("mathRandom() takes no arguments, got %d", len(args))
+			}
+			return &Float{Value: rand.Float64()}
+		},
+	}
+
+	// mathRandomInt(min, max) - returns a random integer between min and max (inclusive)
+	builtins["mathRandomInt"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError("mathRandomInt() takes 2 arguments, got %d", len(args))
+			}
+			min, ok := args[0].(*Integer)
+			if !ok {
+				return newError("mathRandomInt() first argument must be an integer")
+			}
+			max, ok := args[1].(*Integer)
+			if !ok {
+				return newError("mathRandomInt() second argument must be an integer")
+			}
+			if min.Value > max.Value {
+				return newError("mathRandomInt() min must be less than or equal to max")
+			}
+			return &Integer{Value: min.Value + rand.Int63n(max.Value-min.Value+1)}
+		},
+	}
+
+	// mathPi() - returns the value of pi (3.14159...)
+	builtins["mathPi"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			return &Float{Value: math.Pi}
+		},
+	}
+
+	// -------------------------
 	// OS / SYSTEM
 	// -------------------------
 
+	// pwd() - returns the current working directory
 	builtins["pwd"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -967,6 +1390,7 @@ func init() {
 		},
 	}
 
+	// cd(path) - changes the current working directory
 	builtins["cd"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -984,6 +1408,7 @@ func init() {
 		},
 	}
 
+	// env(key) - returns the value of an environment variable, null if not set
 	builtins["env"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -1001,6 +1426,7 @@ func init() {
 		},
 	}
 
+	// setenv(key, value) - sets an environment variable
 	builtins["setenv"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -1022,6 +1448,7 @@ func init() {
 		},
 	}
 
+	// args() - returns command line arguments as an array of strings
 	builtins["args"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1036,6 +1463,7 @@ func init() {
 		},
 	}
 
+	// exit(code?) - exits the program with optional status code (default 0)
 	builtins["exit"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) > 1 {
@@ -1054,6 +1482,7 @@ func init() {
 		},
 	}
 
+	// sleep(ms) - pauses execution for the given number of milliseconds
 	builtins["sleep"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -1068,6 +1497,7 @@ func init() {
 		},
 	}
 
+	// osname() - returns the current OS name e.g "linux", "darwin", "windows"
 	builtins["osname"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1077,6 +1507,7 @@ func init() {
 		},
 	}
 
+	// run(command, args...) - runs a command and returns its output, null on failure
 	builtins["run"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) < 1 {
@@ -1099,6 +1530,7 @@ func init() {
 		},
 	}
 
+	// shell(command) - runs a shell command string and returns output, null on failure
 	builtins["shell"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -1121,6 +1553,7 @@ func init() {
 	// TIME
 	// -------------------------
 
+	// timeNow() - returns current unix timestamp in seconds
 	builtins["timeNow"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1130,6 +1563,7 @@ func init() {
 		},
 	}
 
+	// timeMs() - returns current unix timestamp in milliseconds
 	builtins["timeMs"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1139,6 +1573,7 @@ func init() {
 		},
 	}
 
+	// timeStr() - returns current time as string e.g "15:04:05"
 	builtins["timeStr"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1148,6 +1583,7 @@ func init() {
 		},
 	}
 
+	// dateStr() - returns current date as string e.g "2026-02-28"
 	builtins["dateStr"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1157,6 +1593,7 @@ func init() {
 		},
 	}
 
+	// dateTimeStr() - returns current date and time as string e.g "2026-02-28 15:04:05"
 	builtins["dateTimeStr"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 0 {
@@ -1166,6 +1603,7 @@ func init() {
 		},
 	}
 
+	// timeFormat(timestamp, format) - formats a unix timestamp using a Go time format string
 	builtins["timeFormat"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -1188,6 +1626,7 @@ func init() {
 	// HTTP
 	// -------------------------
 
+	// httpGet(url) - sends a GET request, returns table {status, body}
 	builtins["httpGet"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -1213,6 +1652,7 @@ func init() {
 		},
 	}
 
+	// httpPost(url, body) - sends a POST request with JSON body, returns table {status, body}
 	builtins["httpPost"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -1242,6 +1682,7 @@ func init() {
 		},
 	}
 
+	// httpPatch(url, body) - sends a PATCH request with JSON body, returns table {status, body}
 	builtins["httpPatch"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -1277,6 +1718,7 @@ func init() {
 		},
 	}
 
+	// httpDelete(url) - sends a DELETE request, returns table {status, body}
 	builtins["httpDelete"] = &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
@@ -1311,6 +1753,7 @@ func init() {
 // -------------------------
 // JSON HELPERS
 // -------------------------
+
 func jsonToObject(v interface{}) Object {
 	switch val := v.(type) {
 	case nil:
@@ -1336,8 +1779,7 @@ func jsonToObject(v interface{}) Object {
 	case map[string]interface{}:
 		pairs := map[string]Object{}
 		for k, v2 := range val {
-			obj := jsonToObject(v2)
-			pairs["STRING:"+k] = obj
+			pairs["STRING:"+k] = jsonToObject(v2)
 		}
 		return &Table{Pairs: pairs}
 	default:
@@ -1364,9 +1806,31 @@ func objectToJson(obj Object) interface{} {
 	case *Table:
 		m := map[string]interface{}{}
 		for k, v := range val.Pairs {
-			m[k] = objectToJson(v)
+			parts := strings.SplitN(k, ":", 2)
+			key := k
+			if len(parts) == 2 {
+				key = parts[1]
+			}
+			m[key] = objectToJson(v)
 		}
 		return m
+	default:
+		return nil
+	}
+}
+
+// -------------------------
+// MATH HELPER
+// -------------------------
+
+// toFloat64 converts an Object to a *float64, returns nil if not a number
+func toFloat64(obj Object) *float64 {
+	switch v := obj.(type) {
+	case *Integer:
+		f := float64(v.Value)
+		return &f
+	case *Float:
+		return &v.Value
 	default:
 		return nil
 	}

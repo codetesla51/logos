@@ -1205,3 +1205,44 @@ func TestUse(t *testing.T) {
 		})
 	}
 }
+func TestDotExpression(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		input    string
+		expected string
+	}{
+		{
+			desc:     "simple dot access",
+			input:    `foo.bar`,
+			expected: `(foo.bar)`,
+		},
+		{
+			desc:     "chained dot access",
+			input:    `foo.bar.baz`,
+			expected: `((foo.bar).baz)`,
+		},
+		{
+			desc:     "dot access on call",
+			input:    `foo().bar`,
+			expected: `(foo().bar)`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			lexer := golexer.NewLexer(tc.input)
+			p := NewParser(lexer)
+			program := p.Parse()
+			if len(program.Statements) == 0 {
+				t.Fatalf("[%s] no statements parsed", tc.desc)
+			}
+			expr, ok := program.Statements[0].(*ExpressionStatement)
+			if !ok {
+				t.Fatalf("[%s] expected ExpressionStatement", tc.desc)
+			}
+			if expr.Expression.String() != tc.expected {
+				t.Errorf("[%s] expected %q, got %q", tc.desc, tc.expected, expr.Expression.String())
+			}
+		})
+	}
+}

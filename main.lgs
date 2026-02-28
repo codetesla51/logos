@@ -1,3 +1,5 @@
-let res = httpGet("https://jsonplaceholder.typicode.com/todos/1")
-print(res["status"])
-print(res["body"])
+use "std/math"
+use "std/math"
+use "std/math"
+
+print(mathFib(10))

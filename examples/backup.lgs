@@ -1,0 +1,85 @@
+#!/usr/bin/env logos
+
+fn printBanner() {
+    print(colorBold(colorCyan("╔═══════════════════════════╗")))
+    print(colorBold(colorCyan("║       Backup Tool         ║")))
+    print(colorBold(colorCyan("╚═══════════════════════════╝")))
+    print("")
+}
+
+fn confirm(message) {
+    let ans = prompt(colorYellow(message + " (y/n): "))
+    return lower(trim(ans)) == "y"
+}
+
+fn copyDir(src, dst) {
+    let mkRes = fileMkdir(dst)
+    if !mkRes.ok {
+        print(colorRed("Failed to create: " + dst))
+        return false
+    }
+
+    let dirRes = fileReadDir(src)
+    if !dirRes.ok {
+        print(colorRed("Failed to read: " + src))
+        return false
+    }
+
+    let copied = 0
+    for entry in dirRes.value {
+        let srcPath = src + "/" + entry
+        let dstPath = dst + "/" + entry
+        let copyRes = fileCopy(srcPath, dstPath)
+        if copyRes.ok {
+            copied = copied + 1
+        }
+    }
+    return copied
+}
+
+printBanner()
+
+let sourceDir = trim(prompt(colorCyan("Source directory: ")))
+if !fileExists(sourceDir) {
+    print(colorRed("Error: source does not exist: " + sourceDir))
+    exit(1)
+}
+
+let backupRoot = trim(prompt(colorCyan("Backup destination: ")))
+if !fileExists(backupRoot) {
+    let create = confirm("Destination does not exist. Create it?")
+    if !create {
+        print(colorRed("Aborted."))
+        exit(1)
+    }
+    fileMkdir(backupRoot)
+}
+
+let timestamp = replace(replace(dateTimeStr(), " ", "_"), ":", "-")
+let backupName = "backup_" + timestamp
+let backupPath = backupRoot + "/" + backupName
+
+print("")
+print(colorCyan("Backup path: ") + backupPath)
+print("")
+
+let go = confirm("Start backup?")
+if !go {
+    print(colorYellow("Aborted."))
+    exit(0)
+}
+
+print("")
+print(colorYellow("Backing up..."))
+
+let copied = copyDir(sourceDir, backupPath)
+
+print("")
+print(colorBold("═══════════════════════════"))
+if copied {
+    print(colorGreen("Backup complete: ") + backupPath)
+    print(colorGreen("Files copied: ") + toStr(copied))
+} else {
+    print(colorRed("Backup failed"))
+}
+print(colorBold("═══════════════════════════"))

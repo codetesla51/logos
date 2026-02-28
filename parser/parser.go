@@ -20,6 +20,7 @@ const (
 	PRODUCT         // 7 - *, /
 	PREFIX          // 9 - unary -, !
 	CALL            // 11 - function calls
+	DOT             // 12 - member access (e.g., object.property
 )
 
 // extra tokens
@@ -172,6 +173,11 @@ type UseStatement struct {
 	token    golexer.Token
 	FileName *StringLiteral
 }
+type DotExpression struct {
+	Token golexer.Token
+	Left  Expression
+	Right *Identifier
+}
 type PrefixParsefn func() Expression
 type InfixParsefn func(Expression) Expression
 
@@ -197,6 +203,7 @@ var precedences = map[golexer.TokenType]int{
 	golexer.LPAREN:           CALL,
 	golexer.LBRACKET:         CALL,
 	golexer.MODULUS:          PRODUCT,
+	golexer.DOT:              DOT,
 }
 
 func (p *Program) TokenLiteral() string {
@@ -487,6 +494,18 @@ func (us *UseStatement) String() string {
 	out.WriteString("\"")
 	return out.String()
 }
+func (de *DotExpression) expressionNode()      {}
+func (de *DotExpression) TokenLiteral() string { return de.Token.Literal }
+func (de *DotExpression) String() string {
+
+	var out strings.Builder
+	out.WriteString("(")
+	out.WriteString(de.Left.String())
+	out.WriteString(".")
+	out.WriteString(de.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
 
 // Parser implements a Pratt parser for parsing tokens into an AST.
 type Parser struct {
@@ -624,6 +643,7 @@ func NewParser(lexer *golexer.Lexer) *Parser {
 	})
 	//tables (hash maps)
 	p.registerPrefix(TABLE, p.parseTableLiteral)
+	p.registerInfix(golexer.DOT, p.parseDotExpression)
 	p.nextToken()
 	p.nextToken()
 	return p
@@ -1107,4 +1127,11 @@ func (p *Parser) parseUseStament() *UseStatement {
 		Value: p.curToken.Literal,
 	}
 	return stmt
+}
+func (p *Parser) parseDotExpression(left Expression) Expression {
+	exp := &DotExpression{Token: p.curToken, Left: left}
+	p.nextToken()
+
+	exp.Right = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	return exp
 }

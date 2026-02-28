@@ -1,0 +1,27 @@
+let isNull = fn(val) {
+    return type(val) == "NULL"
+}
+let isString = fn(val) {
+    return type(val) == "STRING"
+}
+let isInt = fn(val) {
+    return type(val) == "INTEGER"
+}
+let isFloat = fn(val) {
+    return type(val) == "FLOAT"
+}
+let isBool = fn(val) {
+    return type(val) == "BOOLEAN"
+}
+let isArray = fn(val) {
+    return type(val) == "ARRAY"
+}
+let isTable = fn(val) {
+    return type(val) == "TABLE"
+}
+let isNumber = fn(val) {
+    return isInt(val) || isFloat(val)
+}
+let isCallable = fn(val) {
+    return type(val) == "FUNCTION"
+}

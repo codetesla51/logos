@@ -1,0 +1,104 @@
+#!/usr/bin/env logos
+
+fn printBanner() {
+    print(colorBold(colorCyan("╔═══════════════════════════╗")))
+    print(colorBold(colorCyan("║      Line Counter         ║")))
+    print(colorBold(colorCyan("╚═══════════════════════════╝")))
+    print("")
+}
+
+fn countLines(content) {
+    let lines = split(content, "\n")
+    let total = 0
+    let blank = 0
+    let comments = 0
+    let code = 0
+
+    for line in lines {
+        let trimmed = trim(line)
+        total = total + 1
+        if len(trimmed) == 0 {
+            blank = blank + 1
+        } else {
+            if startsWith(trimmed, "#") || startsWith(trimmed, "//") {
+                comments = comments + 1
+            } else {
+                code = code + 1
+            }
+        }
+    }
+
+    let result = table{
+        "total": total,
+        "blank": blank,
+        "comments": comments,
+        "code": code
+    }
+    return result
+}
+
+fn processFile(path) {
+    let res = fileRead(path)
+    if !res.ok {
+        print(colorRed("Could not read: " + path))
+        return null
+    }
+    return countLines(res.value)
+}
+
+printBanner()
+
+let target = trim(prompt(colorCyan("File or directory: ")))
+
+if !fileExists(target) {
+    print(colorRed("Error: path does not exist: " + target))
+    exit(1)
+}
+
+let ext = trim(prompt(colorCyan("File extension to count (e.g. lgs, py, js): ")))
+ext = "." + ext
+
+print("")
+
+let totalLines = 0
+let totalBlank = 0
+let totalComments = 0
+let totalCode = 0
+let fileCount = 0
+
+let dirRes = fileReadDir(target)
+if !dirRes.ok {
+    let stats = processFile(target)
+    if stats != null {
+        print(colorBold("File: ") + target)
+        print(colorGreen("Total:    ") + toStr(stats["total"]))
+        print(colorCyan("Code:     ") + toStr(stats["code"]))
+        print(colorYellow("Blank:    ") + toStr(stats["blank"]))
+        print(colorMagenta("Comments: ") + toStr(stats["comments"]))
+    }
+    exit(0)
+}
+
+for file in dirRes.value {
+    if endsWith(file, ext) {
+        let path = target + "/" + file
+        let stats = processFile(path)
+        if stats != null {
+            print(colorCyan("  • ") + file + colorYellow(" (" + toStr(stats["total"]) + " lines)"))
+            totalLines = totalLines + stats["total"]
+            totalBlank = totalBlank + stats["blank"]
+            totalComments = totalComments + stats["comments"]
+            totalCode = totalCode + stats["code"]
+            fileCount = fileCount + 1
+        }
+    }
+}
+
+print("")
+print(colorBold("═══════════════════════════"))
+print(colorBold("Files:    ") + toStr(fileCount))
+print(colorGreen("Total:    ") + toStr(totalLines))
+print(colorCyan("Code:     ") + toStr(totalCode))
+print(colorYellow("Blank:    ") + toStr(totalBlank))
+print(colorMagenta("Comments: ") + toStr(totalComments))
+print(colorBold("═══════════════════════════"))

@@ -1,0 +1,82 @@
+let mathFib = fn(n) {
+    if n <= 1 {
+        return n
+    }
+    return mathFib(n - 1) + mathFib(n - 2)
+}
+let mathFactorial = fn(n) {
+    if n <= 1 {
+        return 1
+    }
+    return n * mathFactorial(n - 1)
+}
+let mathMean = fn(arr) {
+    let sum = reduce(arr, fn(acc, x) {
+        return acc + x
+    }, 0)
+    return sum / len(arr)
+}
+let mathMedian = fn(arr) {
+    let sorted = sort(arr)
+    let mid = len(sorted) / 2
+    if len(sorted) % 2 == 0 {
+        return sorted[mid - 1] + sorted[mid] / 2
+    }
+    return sorted[mid]
+}
+let mathMode = fn(arr) {
+    let counts = table{}
+    for item in arr {
+        let key = toStr(item)
+        if has(counts, key) {
+            counts[key] = counts[key] + 1
+        } else {
+            counts[key] = 1
+        }
+    }
+    let maxCount = 0
+    let mode = null
+    for pair in counts {
+        if pair[1] > maxCount {
+            maxCount = pair[1]
+            mode = pair[0]
+        }
+    }
+    return mode
+}
+let mathClamp = fn(n, min, max) {
+    if n < min {
+        return min
+    }
+    if n > max {
+        return max
+    }
+    return n
+}
+let mathLerp = fn(a, b, t) {
+    return a + b - a * t
+}
+let mathIsPrime = fn(n) {
+    if n < 2 {
+        return false
+    }
+    let i = 2
+    for i * i <= n {
+        if n % i == 0 {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+let mathGcd = fn(a, b) {
+    for b != 0 {
+        let temp = b
+        b = a % b
+        a = temp
+    }
+    return a
+}
+let mathLcm = fn(a, b) {
+    return a / mathGcd(a, b) * b
+}

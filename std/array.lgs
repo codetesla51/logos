@@ -1,0 +1,109 @@
+let arrayMap = fn(arr, func) {
+    let result = []
+    for item in arr {
+        result = push(result, func(item))
+    }
+    return result
+}
+let arrayFilter = fn(arr, func) {
+    let result = []
+    for item in arr {
+        if func(item) {
+            result = push(result, item)
+        }
+    }
+    return result
+}
+let arrayReduce = fn(arr, func, initial) {
+    let acc = initial
+    for item in arr {
+        acc = func(acc, item)
+    }
+    return acc
+}
+let arrayUnique = fn(arr) {
+    let result = []
+    for item in arr {
+        if !contains(result, item) {
+            result = push(result, item)
+        }
+    }
+    return result
+}
+let arrayFlat = fn(arr) {
+    let result = []
+    for item in arr {
+        if type(item) == "ARRAY" {
+            let inner = arrayFlat(item)
+            for el in inner {
+                result = push(result, el)
+            }
+        } else {
+            result = push(result, item)
+        }
+    }
+    return result
+}
+let arrayCopy = fn(arr) {
+    let result = []
+    for item in arr {
+        result = push(result, item)
+    }
+    return result
+}
+let arraySum = fn(arr) {
+    let sum = 0
+    for item in arr {
+        sum = sum + item
+    }
+    return sum
+}
+let arrayMin = fn(arr) {
+    let min = first(arr)
+    for item in arr {
+        if item < min {
+            min = item
+        }
+    }
+    return min
+}
+let arrayMax = fn(arr) {
+    let max = first(arr)
+    for item in arr {
+        if item > max {
+            max = item
+        }
+    }
+    return max
+}
+let arrayContainsAll = fn(arr, items) {
+    for item in items {
+        if !contains(arr, item) {
+            return false
+        }
+    }
+    return true
+}
+let arrayChunk = fn(arr, size) {
+    let result = []
+    let i = 0
+    for i < len(arr) {
+        let end = i + size
+        if end > len(arr) {
+            end = len(arr)
+        }
+        result = push(result, slice(arr, i, end))
+        i = i + size
+    }
+    return result
+}
+let arrayIndexOf = fn(arr, val) {
+    let i = 0
+    for item in arr {
+        if item == val {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}

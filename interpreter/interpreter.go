@@ -44,7 +44,8 @@ type Environment struct {
 	outer *Environment
 }
 type Interpreter struct {
-	Env *Environment
+	Env         *Environment
+	ModuleCache map[string]bool
 }
 type Integer struct {
 	Value int64
@@ -223,7 +224,9 @@ func (e *Environment) Update(name string, val Object) Object {
 	return nil
 }
 func NewInterpreter() *Interpreter {
-	return &Interpreter{Env: NewEnvironment()}
+	return &Interpreter{Env: NewEnvironment(),
+		ModuleCache: make(map[string]bool),
+	}
 }
 func isTruthy(obj Object) bool {
 	switch obj {
@@ -309,6 +312,8 @@ func (i *Interpreter) Eval(node parser.Node, env *Environment) Object {
 		return i.evalTableLiteral(node, env)
 	case *parser.UseStatement:
 		return i.evalUseStatement(node, env)
+	case *parser.DotExpression:
+		return i.evalDotExpression(node, env)
 	default:
 		fmt.Printf("unknown node: %T %+v\n", node, node)
 		return newError("unknown node type %T", node)
@@ -860,14 +865,22 @@ func (i *Interpreter) evalTableLiteral(node *parser.TableLiteral, env *Environme
 
 	return table
 }
+
 func (i *Interpreter) evalUseStatement(node *parser.UseStatement, env *Environment) Object {
 	fileName := node.FileName.Value + ".lgs"
+
+	// already loaded, skip
+	if i.ModuleCache[fileName] {
+		return NULL
+	}
+
 	data, err := os.ReadFile(fileName)
 	if err != nil {
 		return newErrorAt(node.FileName.Token.Line, node.FileName.Token.Column,
 			"module not found: %s", fileName)
 	}
-	lexer := golexer.NewLexerWithConfig(string(data), "../tokens.json")
+
+	lexer := golexer.NewLexerWithConfig(string(data), "tokens.json")
 	p := parser.NewParser(lexer)
 	program := p.Parse()
 	if len(p.Errors()) != 0 {
@@ -877,5 +890,25 @@ func (i *Interpreter) evalUseStatement(node *parser.UseStatement, env *Environme
 		return newErrorAt(node.FileName.Token.Line, node.FileName.Token.Column,
 			"failed to parse module: %s", fileName)
 	}
+
+	i.ModuleCache[fileName] = true
 	return i.Eval(program, env)
+}
+func (i *Interpreter) evalDotExpression(node *parser.DotExpression, env *Environment) Object {
+	left := i.Eval(node.Left, env)
+	if isError(left) {
+		return left
+	}
+	switch obj := left.(type) {
+	case *Table:
+		key := fmt.Sprintf("%s:%s", STRING_OBJ, node.Right.Value)
+		val, ok := obj.Pairs[key]
+		if !ok {
+			return NULL
+		}
+		return val
+	default:
+		return newErrorAt(node.Token.Line, node.Token.Column,
+			"dot operator not supported on type: %s", left.Type())
+	}
 }

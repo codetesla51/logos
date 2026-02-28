@@ -1,0 +1,48 @@
+let strPadStart = fn(str, length, char) {
+    for len(str) < length {
+        str = char + str
+    }
+    return str
+}
+let strPadEnd = fn(str, length, char) {
+    for len(str) < length {
+        str = str + pad
+    }
+    return str
+}
+let strCapitalize = fn(str) {
+    if len(str) == 0 {
+        return str
+    }
+    return upper(slice(str, 0, 1)) + slice(str, 1, len(str))
+}
+let strIsEmpty = fn(str) {
+    return len(trim(str)) == 0
+}
+let strCount = fn(str, sub) {
+    let count = 0
+    let parts = split(str, sub)
+    count = len(parts) - 1
+    return count
+}
+let strReverse = fn(str) {
+    let result = ""
+    let i = len(str) - 1
+    for i >= 0 {
+        result = result + slice(str, i, i + 1)
+        i = i - 1
+    }
+    return result
+}
+let strIsPalindrome = fn(str) {
+    return str == strReverse(str)
+}
+let strRepeat = fn(str, n) {
+    let result = ""
+    let i = 0
+    for i < n {
+        result = result + str
+        i = i + 1
+    }
+    return result
+}

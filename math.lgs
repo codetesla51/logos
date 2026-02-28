@@ -1,0 +1,3 @@
+let sayHello = fn(name) {
+    return "Hello, " + name + "!"
+}
