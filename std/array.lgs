@@ -59,6 +59,10 @@ let arraySum = fn(arr) {
     return sum
 }
 let arrayMin = fn(arr) {
+    if len(arr) == 0 {
+        print("error: arrayMin() called on empty array")
+        exit(1)
+    }
     let min = first(arr)
     for item in arr {
         if item < min {
@@ -68,6 +72,10 @@ let arrayMin = fn(arr) {
     return min
 }
 let arrayMax = fn(arr) {
+    if len(arr) == 0 {
+        print("error: arrayMax() called on empty array")
+        exit(1)
+    }
     let max = first(arr)
     for item in arr {
         if item > max {

@@ -1,53 +1,41 @@
-#!/usr/bin/env logos
-
-fn printBanner() {
+let printBanner = fn() {
     print(colorBold(colorCyan("╔═══════════════════════════╗")))
     print(colorBold(colorCyan("║      Number Guesser       ║")))
     print(colorBold(colorCyan("╚═══════════════════════════╝")))
     print("")
 }
-
 printBanner()
-
 let secret = mathRandomInt(1, 100)
 let attempts = 0
 let maxAttempts = 7
 let won = false
-
 print(colorCyan("I picked a number between 1 and 100"))
 print(colorYellow("You have " + toStr(maxAttempts) + " attempts"))
 print("")
-
 for attempts < maxAttempts {
     let raw = prompt(colorBold("Guess #" + toStr(attempts + 1) + ": "))
     let guess = toInt(trim(raw))
-
     if guess == null {
         print(colorRed("Please enter a valid number"))
         continue
     }
-
     attempts = attempts + 1
-
     if guess == secret {
         won = true
         break
     }
-
     if guess < secret {
         print(colorYellow("Too low!"))
     }
     if guess > secret {
         print(colorYellow("Too high!"))
     }
-
     let remaining = maxAttempts - attempts
     if remaining > 0 {
         print(colorCyan(toStr(remaining) + " attempts left"))
     }
     print("")
 }
-
 print("")
 if won {
     print(colorGreen("🎉 Correct! The number was " + toStr(secret)))

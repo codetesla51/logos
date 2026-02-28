@@ -1,23 +1,17 @@
-#!/usr/bin/env logos
-
 use "std/type"
-
-fn printBanner() {
+let printBanner = fn() {
     print(colorBold(colorCyan("╔═══════════════════════════╗")))
     print(colorBold(colorCyan("║      Logos Cron Runner    ║")))
     print(colorBold(colorCyan("╚═══════════════════════════╝")))
     print("")
 }
-
-fn parseInterval(raw) {
+let parseInterval = fn(raw) {
     let trimmed = trim(raw)
     let unit = slice(trimmed, len(trimmed) - 1, len(trimmed))
     let value = toInt(slice(trimmed, 0, len(trimmed) - 1))
-
     if value == null {
         return null
     }
-
     if unit == "s" {
         return value * 1000
     }
@@ -29,8 +23,7 @@ fn parseInterval(raw) {
     }
     return null
 }
-
-fn runJob(name, command) {
+let runJob = fn(name, command) {
     let timestamp = dateTimeStr()
     print(colorCyan("[" + timestamp + "] ") + colorBold("Running: ") + colorYellow(name))
     let result = shell(command)
@@ -38,7 +31,8 @@ fn runJob(name, command) {
         print(colorRed("  ✗ Failed: " + name))
         return false
     }
-    let lines = split(trim(result), "\n")
+    let lines = split(trim(result), "
+")
     for line in lines {
         print(colorWhite("  │ ") + line)
     }
@@ -46,14 +40,14 @@ fn runJob(name, command) {
     print("")
     return true
 }
-
-fn loadJobs(path) {
+let loadJobs = fn(path) {
     let res = fileRead(path)
     if !res.ok {
         return null
     }
     let jobs = []
-    let lines = split(res.value, "\n")
+    let lines = split(res.value, "
+")
     for line in lines {
         let trimmed = trim(line)
         if len(trimmed) == 0 {
@@ -68,17 +62,15 @@ fn loadJobs(path) {
             continue
         }
         let job = table{
-            "name":     trim(parts[0]),
+            "name": trim(parts[0]),
             "interval": trim(parts[1]),
-            "command":  trim(parts[2])
+            "command": trim(parts[2]),
         }
         jobs = push(jobs, job)
     }
     return jobs
 }
-
 printBanner()
-
 print(colorCyan("Job file format:"))
 print(colorWhite("  name | interval | command"))
 print(colorWhite("  backup | 30s | tar -czf backup.tar.gz ./data"))
@@ -87,15 +79,16 @@ print(colorWhite("  cleanup | 2h | rm -rf /tmp/cache"))
 print("")
 print(colorYellow("Intervals: 30s = 30 seconds, 5m = 5 minutes, 1h = 1 hour"))
 print("")
-
 let jobFile = trim(prompt(colorCyan("Jobs file path (or press enter for jobs.txt): ")))
 if len(jobFile) == 0 {
     jobFile = "jobs.txt"
 }
-
 if !fileExists(jobFile) {
     print(colorYellow("File not found. Creating example jobs.txt..."))
-    let example = "# name | interval | command\nping | 10s | echo pong\ntime | 30s | date\n"
+    let example = "# name | interval | command
+ping | 10s | echo pong
+time | 30s | date
+"
     let writeRes = fileWrite(jobFile, example)
     if !writeRes.ok {
         print(colorRed("Failed to create jobs file: " + writeRes.error))
@@ -105,22 +98,18 @@ if !fileExists(jobFile) {
     print(colorYellow("Edit it and restart. Exiting."))
     exit(0)
 }
-
 let jobs = loadJobs(jobFile)
 if jobs == null {
     print(colorRed("Failed to load jobs from: " + jobFile))
     exit(1)
 }
-
 if len(jobs) == 0 {
     print(colorRed("No valid jobs found in: " + jobFile))
     exit(1)
 }
-
 print("")
 print(colorBold("Loaded " + toStr(len(jobs)) + " job(s):"))
 print("")
-
 let timers = []
 for job in jobs {
     let ms = parseInterval(job["interval"])
@@ -130,21 +119,19 @@ for job in jobs {
     }
     print(colorGreen("  ✓ ") + colorBold(job["name"]) + colorCyan(" every " + job["interval"]) + " → " + job["command"])
     let timer = table{
-        "name":      job["name"],
-        "command":   job["command"],
-        "interval":  ms,
-        "nextRun":   timeMs()
+        "name": job["name"],
+        "command": job["command"],
+        "interval": ms,
+        "nextRun": timeMs(),
     }
     timers = push(timers, timer)
 }
-
 print("")
 print(colorBold("═══════════════════════════"))
 print(colorGreen("Cron runner started!"))
 print(colorYellow("Press Ctrl+C to stop"))
 print(colorBold("═══════════════════════════"))
 print("")
-
 for true {
     let now = timeMs()
     let i = 0
@@ -153,10 +140,10 @@ for true {
         if now >= timer["nextRun"] {
             runJob(timer["name"], timer["command"])
             let updated = table{
-                "name":     timer["name"],
-                "command":  timer["command"],
+                "name": timer["name"],
+                "command": timer["command"],
                 "interval": timer["interval"],
-                "nextRun":  now + timer["interval"]
+                "nextRun": now + timer["interval"],
             }
             let before = slice(timers, 0, i)
             let after = slice(timers, i + 1, len(timers))

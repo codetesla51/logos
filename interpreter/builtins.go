@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1049,6 +1050,29 @@ func init() {
 			for i, el := range arr.Elements {
 				newElements[len(arr.Elements)-1-i] = el
 			}
+			return &Array{Elements: newElements}
+		},
+	}
+
+	builtins["sort"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("sort() takes 1 argument, got %d", len(args))
+			}
+			arr, ok := args[0].(*Array)
+			if !ok {
+				return newError("sort() argument must be an array")
+			}
+			newElements := make([]Object, len(arr.Elements))
+			copy(newElements, arr.Elements)
+			sort.Slice(newElements, func(i, j int) bool {
+				a := toFloat64(newElements[i])
+				b := toFloat64(newElements[j])
+				if a == nil || b == nil {
+					return false
+				}
+				return *a < *b
+			})
 			return &Array{Elements: newElements}
 		},
 	}

@@ -1,3 +1,4 @@
+use "std/array"
 let mathFib = fn(n) {
     if n <= 1 {
         return n
@@ -11,7 +12,7 @@ let mathFactorial = fn(n) {
     return n * mathFactorial(n - 1)
 }
 let mathMean = fn(arr) {
-    let sum = reduce(arr, fn(acc, x) {
+    let sum = arrayReduce(arr, fn(acc, x) {
         return acc + x
     }, 0)
     return sum / len(arr)

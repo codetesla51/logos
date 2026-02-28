@@ -1,25 +1,18 @@
-#!/usr/bin/env logos
-
-fn printBanner() {
+let printBanner = fn() {
     print(colorBold(colorCyan("╔═══════════════════════════╗")))
     print(colorBold(colorCyan("║        LGS Fetch          ║")))
     print(colorBold(colorCyan("╚═══════════════════════════╝")))
     print("")
 }
-
-fn printResponse(res) {
+let printResponse = fn(res) {
     print(colorBold("Status: ") + toStr(res.status))
     print(colorBold("Body:"))
     print(res.body)
 }
-
 printBanner()
-
 let method = upper(trim(prompt(colorCyan("Method (GET/POST/DELETE): "))))
 let url = trim(prompt(colorCyan("URL: ")))
-
 print("")
-
 if method == "GET" {
     print(colorYellow("Sending GET " + url))
     print("")
@@ -30,7 +23,6 @@ if method == "GET" {
     }
     printResponse(res)
 }
-
 if method == "POST" {
     let body = trim(prompt(colorCyan("Body (JSON): ")))
     print(colorYellow("Sending POST " + url))
@@ -42,7 +34,6 @@ if method == "POST" {
     }
     printResponse(res)
 }
-
 if method == "DELETE" {
     print(colorYellow("Sending DELETE " + url))
     print("")

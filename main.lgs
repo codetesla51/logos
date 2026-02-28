@@ -1,5 +1,0 @@
-use "std/math"
-use "std/math"
-use "std/math"
-
-print(mathFib(10))

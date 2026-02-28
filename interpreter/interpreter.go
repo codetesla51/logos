@@ -351,19 +351,53 @@ func (i *Interpreter) evalLetStatement(node *parser.LetStatement, env *Environme
 }
 func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Environment) Object {
 	if node.Operator == "=" {
-		ident, ok := node.Left.(*parser.Identifier)
-		if !ok {
+		switch left := node.Left.(type) {
+		case *parser.Identifier:
+			val := i.Eval(node.Right, env)
+			if isError(val) {
+				return val
+			}
+			result := env.Update(left.Value, val)
+			if result == nil {
+				return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", left.Value)
+			}
+			return val
+
+		case *parser.ArrayIndexExpression:
+			val := i.Eval(node.Right, env)
+			if isError(val) {
+				return val
+			}
+			obj := i.Eval(left.Array, env)
+			if isError(obj) {
+				return obj
+			}
+			index := i.Eval(left.Index, env)
+			if isError(index) {
+				return index
+			}
+			switch collection := obj.(type) {
+			case *Array:
+				idx, ok := index.(*Integer)
+				if !ok {
+					return newErrorAt(node.Token.Line, node.Token.Column, "array index must be an integer")
+				}
+				if idx.Value < 0 || idx.Value >= int64(len(collection.Elements)) {
+					return newErrorAt(node.Token.Line, node.Token.Column, "index out of bounds: %d", idx.Value)
+				}
+				collection.Elements[idx.Value] = val
+				return val
+			case *Table:
+				key := fmt.Sprintf("%s:%s", index.Type(), index.String())
+				collection.Pairs[key] = val
+				return val
+			default:
+				return newErrorAt(node.Token.Line, node.Token.Column, "cannot index assign on type: %s", obj.Type())
+			}
+
+		default:
 			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
 		}
-		val := i.Eval(node.Right, env)
-		if isError(val) {
-			return val
-		}
-		result := env.Update(ident.Value, val)
-		if result == nil {
-			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.Value)
-		}
-		return val
 	}
 	if node.Operator == "+=" {
 		ident, ok := node.Left.(*parser.Identifier)
@@ -423,7 +457,12 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		return result
 	}
 	switch {
-
+	case left.Type() == INTEGER_OBJ && right.Type() == FLOAT_OBJ:
+		l := float64(left.(*Integer).Value)
+		return i.evalFloatInfixExpression(node.Operator, &Float{Value: l}, right, node.Token.Line, node.Token.Column)
+	case left.Type() == FLOAT_OBJ && right.Type() == INTEGER_OBJ:
+		r := float64(right.(*Integer).Value)
+		return i.evalFloatInfixExpression(node.Operator, left, &Float{Value: r}, node.Token.Line, node.Token.Column)
 	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
 		return i.evalIntegerInfixExpression(node.Operator, left, right, node.Token.Line, node.Token.Column)
 	case left.Type() == FLOAT_OBJ && right.Type() == FLOAT_OBJ:

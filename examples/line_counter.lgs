@@ -1,19 +1,16 @@
-#!/usr/bin/env logos
-
-fn printBanner() {
+let printBanner = fn() {
     print(colorBold(colorCyan("╔═══════════════════════════╗")))
     print(colorBold(colorCyan("║      Line Counter         ║")))
     print(colorBold(colorCyan("╚═══════════════════════════╝")))
     print("")
 }
-
-fn countLines(content) {
-    let lines = split(content, "\n")
+let countLines = fn(content) {
+    let lines = split(content, "
+")
     let total = 0
     let blank = 0
     let comments = 0
     let code = 0
-
     for line in lines {
         let trimmed = trim(line)
         total = total + 1
@@ -27,17 +24,15 @@ fn countLines(content) {
             }
         }
     }
-
     let result = table{
         "total": total,
         "blank": blank,
         "comments": comments,
-        "code": code
+        "code": code,
     }
     return result
 }
-
-fn processFile(path) {
+let processFile = fn(path) {
     let res = fileRead(path)
     if !res.ok {
         print(colorRed("Could not read: " + path))
@@ -45,27 +40,20 @@ fn processFile(path) {
     }
     return countLines(res.value)
 }
-
 printBanner()
-
 let target = trim(prompt(colorCyan("File or directory: ")))
-
 if !fileExists(target) {
     print(colorRed("Error: path does not exist: " + target))
     exit(1)
 }
-
 let ext = trim(prompt(colorCyan("File extension to count (e.g. lgs, py, js): ")))
 ext = "." + ext
-
 print("")
-
 let totalLines = 0
 let totalBlank = 0
 let totalComments = 0
 let totalCode = 0
 let fileCount = 0
-
 let dirRes = fileReadDir(target)
 if !dirRes.ok {
     let stats = processFile(target)
@@ -78,7 +66,6 @@ if !dirRes.ok {
     }
     exit(0)
 }
-
 for file in dirRes.value {
     if endsWith(file, ext) {
         let path = target + "/" + file
@@ -93,7 +80,6 @@ for file in dirRes.value {
         }
     }
 }
-
 print("")
 print(colorBold("═══════════════════════════"))
 print(colorBold("Files:    ") + toStr(fileCount))

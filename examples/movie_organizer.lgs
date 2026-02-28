@@ -1,42 +1,31 @@
-#!/usr/bin/env logos
-
-fn printBanner() {
+let printBanner = fn() {
     print(colorBold(colorCyan("╔═══════════════════════════╗")))
     print(colorBold(colorCyan("║     Movie Organizer       ║")))
     print(colorBold(colorCyan("╚═══════════════════════════╝")))
     print("")
 }
-
-fn confirm(message) {
+let confirm = fn(message) {
     let ans = prompt(colorYellow(message + " (y/n): "))
     return lower(trim(ans)) == "y"
 }
-
 let validExts = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".m4v", ".webm"]
-
-fn isMovie(filename) {
+let isMovie = fn(filename) {
     let ext = lower(fileExt(filename))
     return contains(validExts, ext)
 }
-
-fn getMovieName(filename) {
+let getMovieName = fn(filename) {
     let ext = fileExt(filename)
     return replace(filename, ext, "")
 }
-
 printBanner()
-
 let sourceDir = prompt(colorCyan("Enter source directory: "))
 sourceDir = trim(sourceDir)
-
 if !fileExists(sourceDir) {
     print(colorRed("Error: source directory does not exist: " + sourceDir))
     exit(1)
 }
-
 let destDir = prompt(colorCyan("Enter destination directory: "))
 destDir = trim(destDir)
-
 if !fileExists(destDir) {
     let create = confirm("Destination does not exist. Create it?")
     if create {
@@ -51,55 +40,42 @@ if !fileExists(destDir) {
         exit(1)
     }
 }
-
 print("")
-
 let dirResult = fileReadDir(sourceDir)
 if !dirResult.ok {
     print(colorRed("Error reading source: " + dirResult.error))
     exit(1)
 }
-
 let files = dirResult.value
 let movies = []
-
 for file in files {
     if isMovie(file) {
         movies = push(movies, file)
     }
 }
-
 if len(movies) == 0 {
     print(colorYellow("No movie files found in " + sourceDir))
     exit(0)
 }
-
 print(colorBold("Found " + toStr(len(movies)) + " movie(s):"))
 print("")
-
 for movie in movies {
     print(colorCyan("  • ") + movie)
 }
-
 print("")
-
 let go = confirm("Proceed with organizing?")
 if !go {
     print(colorYellow("Aborted."))
     exit(0)
 }
-
 print("")
-
 let moved = 0
 let failed = 0
-
 for file in movies {
     let movieName = getMovieName(file)
     let movieDir = destDir + "/" + movieName
     let srcPath = sourceDir + "/" + file
     let dstPath = movieDir + "/" + file
-
     if !fileExists(movieDir) {
         let mkRes = fileMkdir(movieDir)
         if !mkRes.ok {
@@ -108,18 +84,15 @@ for file in movies {
             continue
         }
     }
-
     let moveRes = fileMove(srcPath, dstPath)
     if !moveRes.ok {
         print(colorRed("✗ Failed to move: " + file + " — " + moveRes.error))
         failed = failed + 1
         continue
     }
-
     print(colorGreen("✓ ") + file + colorCyan(" → ") + movieDir)
     moved = moved + 1
 }
-
 print("")
 print(colorBold("═══════════════════════════"))
 print(colorGreen("Moved:  ") + toStr(moved) + " files")
