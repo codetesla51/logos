@@ -47,6 +47,10 @@ func (f *Formatter) formatStatement(stmt parser.Statement) string {
 		return f.formatSwitch(s)
 	case *parser.UseStatement:
 		return f.tab() + "use " + s.FileName.String()
+	case *parser.SpawnStatment:
+		return f.formatSpawn(s)
+	case *parser.SpawnForInStatement:
+		return f.formatSpawnForIn(s)
 	default:
 		return ""
 	}
@@ -90,6 +94,7 @@ func (f *Formatter) formatExpression(expr parser.Expression) string {
 		return f.formatTable(e)
 	case *parser.DotExpression:
 		return f.formatExpression(e.Left) + "." + e.Right.String()
+
 	default:
 		return ""
 	}
@@ -212,5 +217,17 @@ func (f *Formatter) formatTable(e *parser.TableLiteral) string {
 	}
 	f.indent--
 	out.WriteString(f.tab() + "}")
+	return out.String()
+}
+func (f *Formatter) formatSpawn(e *parser.SpawnStatment) string {
+	var out strings.Builder
+	out.WriteString("spawn ")
+	out.WriteString(f.formatBlock(e.Block))
+	return out.String()
+}
+func (f *Formatter) formatSpawnForIn(s *parser.SpawnForInStatement) string {
+	var out strings.Builder
+	out.WriteString(f.tab() + "spawn " + "for " + s.Item.String() + " in " + f.formatExpression(s.Collection) + " ")
+	out.WriteString(f.formatBlock(s.Body))
 	return out.String()
 }

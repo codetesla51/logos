@@ -1,6 +1,8 @@
-let res = httpGet("https://api.example.com/data")
-if res.ok {
-    print(res.value.body)
-} else {
-    print(res.error)
+let sayHello = fn(name) {
+    return "hello " + name
 }
+spawn {
+    print(sayHello("hi"))
+    print(sayHello("uthman"))
+}
+print("hey")
