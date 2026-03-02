@@ -1,0 +1,30 @@
+project_name: logos
+
+builds:
+  - id: lgs
+    main: .
+    binary: lgs
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: logos
+    format: tar.gz
+    files:
+      - lgs
+    name_template: logos-{{ .Os }}-{{ .Arch }}
+
+release:
+  github:
+    name_template: v{{ .Version }}
+  files:
+    - install.sh
+
+changelog:
+  use: git
