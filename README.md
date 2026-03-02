@@ -4,19 +4,9 @@
 
 <h1 align="center">Logos</h1>
 
-<p align="center">
-  Bash, but you can actually read it.
-</p>
+Logos (from Greek, meaning word, reason, or logic) is a scripting language designed to be read and understood, not deciphered.
 
-<p align="center">
-  <a href="https://logos-lang.dev/docs">Docs</a> ·
-  <a href="https://logos-lang.dev/docs/install">Install</a> ·
-  <a href="https://logos-lang.dev/docs/examples">Examples</a>
-</p>
-
----
-
-Logos is a scripting language for people who got tired of writing bash. It has readable syntax, proper error handling, and compiles to a single binary.
+It's what you reach for when Bash becomes unreadable after line three. A CLI-first language built for the kind of work Bash handles poorly: readable logic, proper error handling, and code you can come back to a week later and still understand.
 
 ```logos
 let res = httpGet("https://api.example.com/data")
@@ -29,20 +19,25 @@ if res.ok {
 }
 ```
 
-## Features
+## Highlights
 
-- Readable C-like syntax
-- Built-in HTTP, JSON, and file I/O
-- Result-based error handling (no exceptions)
-- Concurrency with `spawn`
-- Compiles to standalone binary with `lgs build`
-- Embeddable in Go
+- Readable, C-like syntax that favors clarity
+- Result-based error handling: functions return `{ok, value, error}` instead of throwing
+- Built-in HTTP, JSON, and file I/O primitives
+- Lightweight concurrency with `spawn` blocks
+- Embeddable in Go via `github.com/codetesla51/logos/logos`
+- Scripts use the `.lgs` extension
+- Can be compiled into a standalone binary using `lgs build`
 
 ## Install
 
+Recommended (installer hosted in this repo):
+
 ```sh
-curl -fsSL https://install.logos-lang.dev | sh
+curl -fsSL https://raw.githubusercontent.com/codetesla51/logos/main/install.sh | sh
 ```
+
+This downloads the installer from the repository and picks the correct release asset for your OS/arch. Works on Linux and macOS.
 
 ## Quick Start
 
@@ -50,12 +45,16 @@ curl -fsSL https://install.logos-lang.dev | sh
 lgs script.lgs        # run a script
 lgs                   # start REPL
 lgs fmt script.lgs    # format code
-lgs build script.lgs  # compile to binary
+lgs build script.lgs  # compile to a standalone binary
 ```
 
 ## Docs
 
-See [logos-lang.dev/docs](https://logos-lang.dev/docs) for full documentation.
+Full documentation is available at https://logos-lang.dev/docs.
+
+## Contributing
+
+Contributions are welcome. If you'd like to add examples, standard library utilities, or help with releases, open an issue or a PR on GitHub: https://github.com/codetesla51/logos
 
 ## License
 
