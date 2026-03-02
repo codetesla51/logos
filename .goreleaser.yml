@@ -23,9 +23,11 @@ archives:
 
 release:
   github:
-    name_template: v{{ .Version }}
-  files:
-    - install.sh
+    owner: codetesla51
+    name: logos
+  name_template: "v{{ .Version }}"
+  extra_files:
+    - glob: install.sh
 
 changelog:
   use: git
