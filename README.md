@@ -50,7 +50,7 @@ lgs build script.lgs  # compile to a standalone binary
 
 ## Docs
 
-Full documentation is available at https://logos-lang.dev/docs.
+Full documentation and the landing page are available at https://logos-lang.vercel.app/ (docs at https://logos-lang.vercel.app/docs).
 
 ## Contributing
 
