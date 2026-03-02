@@ -38,15 +38,31 @@ main() {
     trap 'rm -rf "$tmp_dir"' EXIT
 
     echo "Downloading from ${url}..."
-    
-    if ! curl -fsSL "$url" -o "${tmp_dir}/logos.tar.gz"; then
-        echo "Error: Download failed"
+
+    # Download with a small spinner/loader
+    curl -fsSL "$url" -o "${tmp_dir}/logos.tar.gz" &
+    dl_pid=$!
+
+    spinner_watch "$dl_pid" "Downloading..."
+
+    wait "$dl_pid"
+    dl_rc=$?
+    if [ "$dl_rc" -ne 0 ]; then
+        echo "\nError: Download failed"
         echo "Make sure a release exists for ${target}"
         exit 1
     fi
 
-    # Extract
-    tar -xzf "${tmp_dir}/logos.tar.gz" -C "$tmp_dir"
+    # Extract with loader
+    (tar -xzf "${tmp_dir}/logos.tar.gz" -C "$tmp_dir") &
+    tar_pid=$!
+    spinner_watch "$tar_pid" "Extracting..."
+    wait "$tar_pid"
+    tar_rc=$?
+    if [ "$tar_rc" -ne 0 ]; then
+        echo "\nError: Failed to extract archive"
+        exit 1
+    fi
 
     # Install
     if [ -w "$INSTALL_DIR" ]; then
@@ -79,6 +95,22 @@ detect_arch() {
         aarch64) echo "arm64" ;;
         *)       echo "" ;;
     esac
+}
+
+spinner_watch() {
+    # $1 = pid to watch
+    # $2 = message prefix
+    pid="$1"
+    msg="$2"
+    spin='-\\|/'
+    i=0
+    printf "%s " "$msg"
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\b%s" "${spin:i%${#spin}:1}"
+        sleep 0.1
+        i=$((i+1))
+    done
+    printf "\b"  # remove spinner char
 }
 
 main
