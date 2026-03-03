@@ -623,15 +623,67 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		if !ok {
 			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
 		}
-		if _, exists := env.Get(ident.Value); !exists {
+		currentVal, exists := env.Get(ident.Value)
+		if !exists {
 			return i.fileError(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.String())
 		}
-		result := i.evalInfixExpression(&parser.InfixExpression{
-			Token:    node.Token,
-			Left:     node.Left,
-			Operator: "+",
-			Right:    node.Right,
-		}, env)
+		rightVal := i.Eval(node.Right, env)
+		if isError(rightVal) {
+			return rightVal
+		}
+		// Compute the result based on types
+		var result Object
+		switch {
+		case currentVal.Type() == INTEGER_OBJ && rightVal.Type() == FLOAT_OBJ:
+			l := float64(currentVal.(*Integer).Value)
+			result = i.evalFloatInfixExpression("+", &Float{Value: l}, rightVal, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == FLOAT_OBJ && rightVal.Type() == INTEGER_OBJ:
+			r := float64(rightVal.(*Integer).Value)
+			result = i.evalFloatInfixExpression("+", currentVal, &Float{Value: r}, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == INTEGER_OBJ && rightVal.Type() == INTEGER_OBJ:
+			result = i.evalIntegerInfixExpression("+", currentVal, rightVal, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == FLOAT_OBJ && rightVal.Type() == FLOAT_OBJ:
+			result = i.evalFloatInfixExpression("+", currentVal, rightVal, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == STRING_OBJ && rightVal.Type() == STRING_OBJ:
+			result = i.evalStringInfixExpression("+", currentVal, rightVal, node.Token.Line, node.Token.Column)
+		default:
+			return i.fileError(node.Token.Line, node.Token.Column, "cannot use += with types %s and %s", currentVal.Type(), rightVal.Type())
+		}
+		if isError(result) {
+			return result
+		}
+		env.Update(ident.Value, result)
+		return result
+	}
+	if node.Operator == "-=" {
+		ident, ok := node.Left.(*parser.Identifier)
+		if !ok {
+			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
+		}
+		currentVal, exists := env.Get(ident.Value)
+		if !exists {
+			return i.fileError(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.String())
+		}
+		rightVal := i.Eval(node.Right, env)
+		if isError(rightVal) {
+			return rightVal
+		}
+		// Compute the result based on types
+		var result Object
+		switch {
+		case currentVal.Type() == INTEGER_OBJ && rightVal.Type() == FLOAT_OBJ:
+			l := float64(currentVal.(*Integer).Value)
+			result = i.evalFloatInfixExpression("-", &Float{Value: l}, rightVal, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == FLOAT_OBJ && rightVal.Type() == INTEGER_OBJ:
+			r := float64(rightVal.(*Integer).Value)
+			result = i.evalFloatInfixExpression("-", currentVal, &Float{Value: r}, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == INTEGER_OBJ && rightVal.Type() == INTEGER_OBJ:
+			result = i.evalIntegerInfixExpression("-", currentVal, rightVal, node.Token.Line, node.Token.Column)
+		case currentVal.Type() == FLOAT_OBJ && rightVal.Type() == FLOAT_OBJ:
+			result = i.evalFloatInfixExpression("-", currentVal, rightVal, node.Token.Line, node.Token.Column)
+		default:
+			return i.fileError(node.Token.Line, node.Token.Column, "cannot use -= with types %s and %s", currentVal.Type(), rightVal.Type())
+		}
 		if isError(result) {
 			return result
 		}
@@ -645,26 +697,6 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 	right := i.Eval(node.Right, env)
 	if isError(right) {
 		return right
-	}
-	if node.Operator == "-=" {
-		ident, ok := node.Left.(*parser.Identifier)
-		if !ok {
-			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
-		}
-		if _, exists := env.Get(ident.Value); !exists {
-			return i.fileError(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.String())
-		}
-		result := i.evalInfixExpression(&parser.InfixExpression{
-			Token:    node.Token,
-			Left:     node.Left,
-			Operator: "-",
-			Right:    node.Right,
-		}, env)
-		if isError(result) {
-			return result
-		}
-		env.Update(ident.Value, result)
-		return result
 	}
 	switch {
 	case left.Type() == INTEGER_OBJ && right.Type() == FLOAT_OBJ:
