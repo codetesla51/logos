@@ -614,7 +614,7 @@ func TestCompoundAssignments(t *testing.T) {
 		{`let x = 10; x -= 3; x -= 2; x`, "5", "-= chained"},
 		{`let x = 0; x += 1; x += 1; x += 1; x`, "3", "+= increments"},
 		// errors
-		{`x += 1`, "ERROR [1:1]: identifier not found: x", "+= on undeclared variable"},
+		{`x += 1`, "ERROR [1:6]: cannot assign to undeclared variable: x", "+= on undeclared variable"},
 	}
 
 	for _, tc := range testCases {

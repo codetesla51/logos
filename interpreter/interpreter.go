@@ -623,11 +623,7 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		if !ok {
 			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
 		}
-		val := i.Eval(node.Right, env)
-		if isError(val) {
-			return val
-		}
-		if !ok {
+		if _, exists := env.Get(ident.Value); !exists {
 			return i.fileError(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.String())
 		}
 		result := i.evalInfixExpression(&parser.InfixExpression{
@@ -641,7 +637,6 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		}
 		env.Update(ident.Value, result)
 		return result
-
 	}
 	left := i.Eval(node.Left, env)
 	if isError(left) {
@@ -656,11 +651,7 @@ func (i *Interpreter) evalInfixExpression(node *parser.InfixExpression, env *Env
 		if !ok {
 			return newErrorAt(node.Token.Line, node.Token.Column, "cannot assign to non-identifier")
 		}
-		val := i.Eval(node.Right, env)
-		if isError(val) {
-			return val
-		}
-		if !ok {
+		if _, exists := env.Get(ident.Value); !exists {
 			return i.fileError(node.Token.Line, node.Token.Column, "cannot assign to undeclared variable: %s", ident.String())
 		}
 		result := i.evalInfixExpression(&parser.InfixExpression{
@@ -1025,7 +1016,7 @@ func (i *Interpreter) evalSwitchCase(node *parser.SwitchCase, env *Environment, 
 	if isError(caseVal) {
 		return caseVal
 	}
-	if cond.String() == caseVal.String() {
+	if cond.String() == caseVal.String() && cond.Type() == caseVal.Type() {
 		result := i.Eval(node.Body, env)
 		if isError(result) {
 			return result
