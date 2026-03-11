@@ -108,6 +108,63 @@ func init() {
 		},
 	}
 
+	builtins["confirm"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError("confirm() takes 1 argument, got %d", len(args))
+			}
+			msg, ok := args[0].(*String)
+			if !ok {
+				return newError("confirm() argument must be a string")
+			}
+			fmt.Print(msg.Value + " (y/n): ")
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			if err := scanner.Err(); err != nil {
+				return FALSE
+			}
+			input := strings.TrimSpace(strings.ToLower(scanner.Text()))
+			if input == "y" || input == "yes" {
+				return TRUE
+			}
+			return FALSE
+		},
+	}
+
+	builtins["select"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError("select() takes 2 arguments, got %d", len(args))
+			}
+			msg, ok := args[0].(*String)
+			if !ok {
+				return newError("select() first argument must be a string")
+			}
+			options, ok := args[1].(*Array)
+			if !ok {
+				return newError("select() second argument must be an array")
+			}
+			if len(options.Elements) == 0 {
+				return newError("select() options array cannot be empty")
+			}
+			fmt.Println(msg.Value)
+			for i, opt := range options.Elements {
+				fmt.Printf("  %d) %s\n", i+1, opt.String())
+			}
+			fmt.Print("Enter number: ")
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			if err := scanner.Err(); err != nil {
+				return NULL
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
+			if err != nil || n < 1 || n > len(options.Elements) {
+				return newError("select() invalid choice")
+			}
+			return options.Elements[n-1]
+		},
+	}
+
 	// -------------------------
 	// COLOR OUTPUT
 	// -------------------------
