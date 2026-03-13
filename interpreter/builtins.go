@@ -1735,14 +1735,31 @@ func init() {
 
 	builtins["httpGet"] = &Builtin{
 		Fn: func(args ...Object) Object {
-			if len(args) != 1 {
-				return newError("httpGet() takes 1 argument, got %d", len(args))
+			if len(args) < 1 || len(args) > 2 {
+				return newError("httpGet() takes 1 or 2 arguments, got %d", len(args))
 			}
 			url, ok := args[0].(*String)
 			if !ok {
-				return newError("httpGet() argument must be a string")
+				return newError("httpGet() first argument must be a string")
 			}
-			resp, err := http.Get(url.Value)
+			req, err := http.NewRequest("GET", url.Value, nil)
+			if err != nil {
+				return errResult("httpGet failed to build request: %s", err.Error())
+			}
+			if len(args) == 2 {
+				headers, ok := args[1].(*Table)
+				if !ok {
+					return newError("httpGet() second argument must be a table")
+				}
+				for k, v := range headers.Pairs {
+					key := strings.TrimPrefix(k, "STRING:")
+					if str, ok := v.(*String); ok {
+						req.Header.Set(key, str.Value)
+					}
+				}
+			}
+			client := &http.Client{}
+			resp, err := client.Do(req)
 			if err != nil {
 				return errResult("httpGet failed: %s", err.Error())
 			}
@@ -1760,8 +1777,8 @@ func init() {
 
 	builtins["httpPost"] = &Builtin{
 		Fn: func(args ...Object) Object {
-			if len(args) != 2 {
-				return newError("httpPost() takes 2 arguments, got %d", len(args))
+			if len(args) < 2 || len(args) > 3 {
+				return newError("httpPost() takes 2 or 3 arguments, got %d", len(args))
 			}
 			url, ok := args[0].(*String)
 			if !ok {
@@ -1771,7 +1788,25 @@ func init() {
 			if !ok {
 				return newError("httpPost() second argument must be a string")
 			}
-			resp, err := http.Post(url.Value, "application/json", strings.NewReader(body.Value))
+			req, err := http.NewRequest("POST", url.Value, strings.NewReader(body.Value))
+			if err != nil {
+				return errResult("httpPost failed to build request: %s", err.Error())
+			}
+			req.Header.Set("Content-Type", "application/json")
+			if len(args) == 3 {
+				headers, ok := args[2].(*Table)
+				if !ok {
+					return newError("httpPost() third argument must be a table")
+				}
+				for k, v := range headers.Pairs {
+					key := strings.TrimPrefix(k, "STRING:")
+					if str, ok := v.(*String); ok {
+						req.Header.Set(key, str.Value)
+					}
+				}
+			}
+			client := &http.Client{}
+			resp, err := client.Do(req)
 			if err != nil {
 				return errResult("httpPost failed: %s", err.Error())
 			}
@@ -1787,10 +1822,57 @@ func init() {
 		},
 	}
 
+	builtins["httpPut"] = &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 || len(args) > 3 {
+				return newError("httpPut() takes 2 or 3 arguments, got %d", len(args))
+			}
+			url, ok := args[0].(*String)
+			if !ok {
+				return newError("httpPut() first argument must be a string")
+			}
+			body, ok := args[1].(*String)
+			if !ok {
+				return newError("httpPut() second argument must be a string")
+			}
+			req, err := http.NewRequest("PUT", url.Value, strings.NewReader(body.Value))
+			if err != nil {
+				return errResult("httpPut failed to build request: %s", err.Error())
+			}
+			req.Header.Set("Content-Type", "application/json")
+			if len(args) == 3 {
+				headers, ok := args[2].(*Table)
+				if !ok {
+					return newError("httpPut() third argument must be a table")
+				}
+				for k, v := range headers.Pairs {
+					key := strings.TrimPrefix(k, "STRING:")
+					if str, ok := v.(*String); ok {
+						req.Header.Set(key, str.Value)
+					}
+				}
+			}
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				return errResult("httpPut failed: %s", err.Error())
+			}
+			defer resp.Body.Close()
+			respBody, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return errResult("httpPut failed to read body: %s", err.Error())
+			}
+			pairs := map[string]Object{}
+			pairs["STRING:body"] = &String{Value: string(respBody)}
+			pairs["STRING:status"] = &Integer{Value: int64(resp.StatusCode)}
+			return okResult(&Table{Pairs: pairs})
+		},
+	}
+
 	builtins["httpPatch"] = &Builtin{
 		Fn: func(args ...Object) Object {
-			if len(args) != 2 {
-				return newError("httpPatch() takes 2 arguments, got %d", len(args))
+			if len(args) < 2 || len(args) > 3 {
+				return newError("httpPatch() takes 2 or 3 arguments, got %d", len(args))
 			}
 			url, ok := args[0].(*String)
 			if !ok {
@@ -1805,6 +1887,18 @@ func init() {
 				return errResult("httpPatch failed to build request: %s", err.Error())
 			}
 			req.Header.Set("Content-Type", "application/json")
+			if len(args) == 3 {
+				headers, ok := args[2].(*Table)
+				if !ok {
+					return newError("httpPatch() third argument must be a table")
+				}
+				for k, v := range headers.Pairs {
+					key := strings.TrimPrefix(k, "STRING:")
+					if str, ok := v.(*String); ok {
+						req.Header.Set(key, str.Value)
+					}
+				}
+			}
 			client := &http.Client{}
 			resp, err := client.Do(req)
 			if err != nil {
@@ -1824,16 +1918,28 @@ func init() {
 
 	builtins["httpDelete"] = &Builtin{
 		Fn: func(args ...Object) Object {
-			if len(args) != 1 {
-				return newError("httpDelete() takes 1 argument, got %d", len(args))
+			if len(args) < 1 || len(args) > 2 {
+				return newError("httpDelete() takes 1 or 2 arguments, got %d", len(args))
 			}
 			url, ok := args[0].(*String)
 			if !ok {
-				return newError("httpDelete() argument must be a string")
+				return newError("httpDelete() first argument must be a string")
 			}
 			req, err := http.NewRequest("DELETE", url.Value, nil)
 			if err != nil {
 				return errResult("httpDelete failed to build request: %s", err.Error())
+			}
+			if len(args) == 2 {
+				headers, ok := args[1].(*Table)
+				if !ok {
+					return newError("httpDelete() second argument must be a table")
+				}
+				for k, v := range headers.Pairs {
+					key := strings.TrimPrefix(k, "STRING:")
+					if str, ok := v.(*String); ok {
+						req.Header.Set(key, str.Value)
+					}
+				}
 			}
 			client := &http.Client{}
 			resp, err := client.Do(req)
